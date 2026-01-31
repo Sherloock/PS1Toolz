@@ -1,6 +1,6 @@
 # Media library utilities
 
-function List-Size {
+function Size {
     <#
     .SYNOPSIS
         Lists files and folders sorted by size in descending order.
@@ -12,7 +12,7 @@ function List-Size {
     Get-ChildItem -Depth $Depth -ErrorAction SilentlyContinue | ForEach-Object {
         $itemSize = 0
         if ($_.PSIsContainer) {
-            $files = Get-ChildItem -LiteralPath $_.FullName -Recurse -File -ErrorAction SilentlyContinue 
+            $files = Get-ChildItem -LiteralPath $_.FullName -Recurse -File -ErrorAction SilentlyContinue
             $itemSize = ($files | Measure-Object -Property Length -Sum).Sum
         } else {
             $itemSize = $_.Length
@@ -28,7 +28,7 @@ function List-Size {
     } | Sort-Object RawSize -Descending | Select-Object Size, Path
 }
 
-function List-Video {
+function Movies {
     <#
     .SYNOPSIS
         Aggregates content from 3 specific paths and shows a total summary.
@@ -43,22 +43,22 @@ function List-Video {
                 $itemSize = 0
                 if ($_.PSIsContainer) {
                     $itemSize = (Get-ChildItem -LiteralPath $_.FullName -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
-                } else { 
-                    $itemSize = $_.Length 
+                } else {
+                    $itemSize = $_.Length
                 }
-                
+
                 if ($null -eq $itemSize) { $itemSize = 0 }
                 $totalBytes += $itemSize
-                [PSCustomObject]@{ 
+                [PSCustomObject]@{
                     Size = Get-ReadableSize -Bytes $itemSize
                     RawSize = $itemSize
-                    Path = $_.FullName 
+                    Path = $_.FullName
                 }
             }
             $allResults += $results
         }
     }
-    
+
     $allResults | Sort-Object RawSize -Descending | Select-Object Size, Path
     Write-Host "`n------------------------------" -ForegroundColor Cyan
     Write-Host "TOTAL AGGREGATED SIZE: $(Get-ReadableSize -Bytes $totalBytes)" -ForegroundColor Green

@@ -1,6 +1,6 @@
 # System information and diagnostics
 
-function Show-IP {
+function ShowIP {
     <#
     .SYNOPSIS
         Displays instant local network info and fetches public details without clutter.

@@ -1,6 +1,6 @@
 # Quick navigation bookmarks
 
-function go {
+function Go {
     <#
     .SYNOPSIS
         Jumps to bookmarked paths. Type 'go' without params to see the list.
@@ -13,7 +13,7 @@ function go {
     $Bookmarks = [ordered]@{
         "c"       = "C:\"
         "f"       = "F:\"
-        "my"      = "F:\Fejlesztes\projects\my" 
+        "my"      = "F:\Fejlesztes\projects\my"
         "o42"     = "F:\Fejlesztes\projects\office42"
         "movies"  = "F:\_movies"
         "shows"   = "F:\_shows"

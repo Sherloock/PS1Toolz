@@ -4,8 +4,9 @@ Modular PowerShell environment for Full Stack development and System Management.
 
 ## Structure
 
-- `loader.ps1`: The loader script (copy content to your Windows Profile path).
+- `loader.ps1`: The loader script (dot-source from your PowerShell Profile).
 - `core/`: Basic system utilities (IP, Disk, Timer, Dashboard).
+  - `Helpers.ps1`: Internal helper functions (loaded first, excluded from dashboard).
 - `dev/`: Development tools (Node cleanup, Port kill, Passwords, Navigation).
 - `media/`: Movie and show library management.
 
@@ -13,27 +14,43 @@ Modular PowerShell environment for Full Stack development and System Management.
 
 1. Clone this repo to `f:\Fejlesztes\projects\my\ps-tools`.
 2. Run `Win + R` -> `notepad $PROFILE`.
-3. Paste the content from `loader.ps1` into your profile.
+3. Add this line to your profile:
+   ```powershell
+   . "f:\Fejlesztes\projects\my\ps-tools\loader.ps1"
+   ```
 4. Restart PowerShell or run `. $PROFILE` to reload.
 
 ## Usage
 
-Type `??` in PowerShell to see all available commands with descriptions.
+- Type `??` in PowerShell to see all available commands.
+- Type `timer` to see timer-specific commands.
+- Type `Reload` to hot-reload all scripts after making changes.
 
 ## Functions
 
 ### Core
-- `Show-IP` - Network dashboard with local and public IP info
+
+- `Reload` - Hot-reload all scripts without restarting PowerShell
+- `ShowIP` - Network dashboard with local and public IP info
 - `Disk-Space` - Disk usage dashboard with color-coded warnings
 - `Fast` - Internet speed test using Speedtest CLI
-- `timer` / `btimer` / `timer-bg` - Countdown timers (foreground/background)
+
+### Timer (type `timer` for help)
+
+- `Timer <time>` - Foreground countdown (blocks terminal)
+- `TimerBg <time> [-m msg] [-r N]` - Background timer with optional repeat
+- `TimerList [-a]` - List active timers
+- `TimerStop [id|all]` - Stop timer(s)
+- `TimerRemove [id|done|all]` - Remove timer(s)
 
 ### Dev
+
 - `Pass` - Secure password generator
-- `Port-Kill` - Kill process by port number
-- `Clean-Node` - Find and remove node_modules folders
-- `go` - Quick navigation bookmarks
+- `PortKill` - Kill process by port number
+- `CleanNode` - Find and remove node_modules folders
+- `Go` - Quick navigation bookmarks
 
 ### Media
-- `List-Size` - List files/folders sorted by size
-- `List-Video` - Aggregate video library statistics
+
+- `Size` - List files/folders sorted by size
+- `Movies` - Aggregate video library statistics
