@@ -15,32 +15,32 @@ function Show-TimerHelp {
     Write-Host "  ==============" -ForegroundColor DarkCyan
     Write-Host ""
     Write-Host "  " -NoNewline
-    Write-Host "timer <time>" -ForegroundColor Yellow -NoNewline
+    Write-Host "t <time>" -ForegroundColor Yellow -NoNewline
     Write-Host " [-m 'msg']" -ForegroundColor Gray
     Write-Host "      Foreground countdown (blocks terminal)" -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  " -NoNewline
-    Write-Host "TimerBg <time>" -ForegroundColor Yellow -NoNewline
+    Write-Host "tbg <time>" -ForegroundColor Yellow -NoNewline
     Write-Host " [-m 'msg'] [-r N]" -ForegroundColor Gray
     Write-Host "      Background timer with optional repeat" -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  " -NoNewline
-    Write-Host "TimerList" -ForegroundColor Yellow -NoNewline
-    Write-Host " [-a]" -ForegroundColor Gray
-    Write-Host "      List active timers (-a for all including done)" -ForegroundColor DarkGray
+    Write-Host "tlist" -ForegroundColor Yellow -NoNewline
+    Write-Host " [-a] [-w]" -ForegroundColor Gray
+    Write-Host "      List active timers (-a all, -w live watch)" -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  " -NoNewline
-    Write-Host "TimerStop" -ForegroundColor Yellow -NoNewline
+    Write-Host "tstop" -ForegroundColor Yellow -NoNewline
     Write-Host " [id|all]" -ForegroundColor Gray
     Write-Host "      Pause specific timer or all (can resume)" -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  " -NoNewline
-    Write-Host "TimerResume" -ForegroundColor Yellow -NoNewline
+    Write-Host "tresume" -ForegroundColor Yellow -NoNewline
     Write-Host " [id|all]" -ForegroundColor Gray
     Write-Host "      Resume stopped timer(s)" -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  " -NoNewline
-    Write-Host "TimerRemove" -ForegroundColor Yellow -NoNewline
+    Write-Host "tremove" -ForegroundColor Yellow -NoNewline
     Write-Host " [id|done|all]" -ForegroundColor Gray
     Write-Host "      Remove timer(s) from list" -ForegroundColor DarkGray
     Write-Host ""
@@ -48,9 +48,9 @@ function Show-TimerHelp {
     Write-Host "1h30m, 25m, 90s, 1h20m30s" -ForegroundColor White
     Write-Host ""
     Write-Host "  Examples:" -ForegroundColor DarkGray
-    Write-Host "    timer 25m -m 'Coffee break'" -ForegroundColor Gray
-    Write-Host "    TimerBg 1h -r 3 -m 'Stretch'" -ForegroundColor Gray
-    Write-Host "    TimerStop abc1" -ForegroundColor Gray
+    Write-Host "    t 25m -m 'Coffee break'" -ForegroundColor Gray
+    Write-Host "    tbg 1h -r 3 -m 'Stretch'" -ForegroundColor Gray
+    Write-Host "    tstop 1" -ForegroundColor Gray
     Write-Host ""
 }
 
@@ -199,9 +199,30 @@ function TimerList {
         Shows all background timers with detailed status.
     .PARAMETER All
         Include completed/stopped timers in the list.
+    .PARAMETER Watch
+        Live-updating display with countdown. Press any key to exit.
     #>
     param(
-        [Alias('a')][switch]$All
+        [Alias('a')][switch]$All,
+        [Alias('w')][switch]$Watch
+    )
+
+    if ($Watch) {
+        Show-TimerListWatch -All:$All
+        return
+    }
+
+    Show-TimerListOnce -All:$All -ShowCommands
+}
+
+function Show-TimerListOnce {
+    <#
+    .SYNOPSIS
+        Internal function to display timer list once.
+    #>
+    param(
+        [switch]$All,
+        [switch]$ShowCommands
     )
 
     $timers = @(Sync-TimerData)
@@ -209,7 +230,7 @@ function TimerList {
     if ($timers.Count -eq 0) {
         Write-Host "`n  No timers found." -ForegroundColor Gray
         Write-Host "  Use 'TimerBg <time>' to create one.`n" -ForegroundColor DarkGray
-        return
+        return $false
     }
 
     # Filter if not showing all
@@ -220,22 +241,45 @@ function TimerList {
     if ($timers.Count -eq 0) {
         Write-Host "`n  No active timers." -ForegroundColor Gray
         Write-Host "  Use 'TimerList -a' to see all timers.`n" -ForegroundColor DarkGray
-        return
+        return $false
     }
 
+    # Count by state
+    $running = @($timers | Where-Object { $_.State -eq 'Running' }).Count
+    $stopped = @($timers | Where-Object { $_.State -eq 'Stopped' }).Count
+
     Write-Host ""
-    Write-Host "  BACKGROUND TIMERS" -ForegroundColor Cyan
+    Write-Host "  BACKGROUND TIMERS " -ForegroundColor Cyan -NoNewline
+    Write-Host "($running running" -ForegroundColor Green -NoNewline
+    if ($stopped -gt 0) {
+        Write-Host ", $stopped stopped" -ForegroundColor Yellow -NoNewline
+    }
+    Write-Host ")" -ForegroundColor Gray
     Write-Host "  =================" -ForegroundColor DarkCyan
     Write-Host ""
 
+    # Column widths
+    $colId = 5
+    $colState = 10
+    $colDuration = 11
+    $colRemaining = 11
+    $colEndsAt = 10
+    $colRepeat = 8
+
     # Header
-    $header = "  {0,-6} {1,-10} {2,-10} {3,-10} {4,-10} {5,-10} {6}" -f "ID", "STATE", "DURATION", "REMAINING", "ENDS AT", "REPEAT", "MESSAGE"
-    Write-Host $header -ForegroundColor DarkGray
-    Write-Host ("  " + ("-" * 80)) -ForegroundColor DarkGray
+    Write-Host "  " -NoNewline
+    Write-Host ("{0,-$colId}" -f "ID") -ForegroundColor DarkGray -NoNewline
+    Write-Host ("{0,-$colState}" -f "STATE") -ForegroundColor DarkGray -NoNewline
+    Write-Host ("{0,-$colDuration}" -f "DURATION") -ForegroundColor DarkGray -NoNewline
+    Write-Host ("{0,-$colRemaining}" -f "REMAINING") -ForegroundColor DarkGray -NoNewline
+    Write-Host ("{0,-$colEndsAt}" -f "ENDS AT") -ForegroundColor DarkGray -NoNewline
+    Write-Host ("{0,-$colRepeat}" -f "REPEAT") -ForegroundColor DarkGray -NoNewline
+    Write-Host "MESSAGE" -ForegroundColor DarkGray
+    Write-Host ("  " + ("-" * 75)) -ForegroundColor DarkGray
 
     foreach ($t in $timers) {
         $now = Get-Date
-        $endTime = [DateTime]::ParseExact($t.EndTime, 'o', $null)
+        $endTime = [DateTime]::Parse($t.EndTime)
 
         # Calculate remaining time
         $remaining = $endTime - $now
@@ -272,37 +316,154 @@ function TimerList {
         # Ends at time
         $endsAtStr = if ($t.State -eq 'Running') { $endTime.ToString('HH:mm:ss') } else { "-" }
 
+        # Duration formatted
+        $durationStr = Format-Duration -Seconds $t.Seconds
+
         # Output row
         Write-Host "  " -NoNewline
-        Write-Host ("{0,-6}" -f $t.Id) -ForegroundColor Cyan -NoNewline
-        Write-Host ("{0,-10}" -f $t.State) -ForegroundColor $stateColor -NoNewline
-        Write-Host ("{0,-10}" -f (Format-Duration -Seconds $t.Seconds)) -ForegroundColor White -NoNewline
+        Write-Host ("{0,-$colId}" -f $t.Id) -ForegroundColor Cyan -NoNewline
+        Write-Host ("{0,-$colState}" -f $t.State) -ForegroundColor $stateColor -NoNewline
+        Write-Host ("{0,-$colDuration}" -f $durationStr) -ForegroundColor White -NoNewline
 
         if ($t.State -eq 'Running') {
-            Write-Host ("{0,-10}" -f $remainingStr) -ForegroundColor Yellow -NoNewline
-            Write-Host ("{0,-10}" -f $endsAtStr) -ForegroundColor Green -NoNewline
+            Write-Host ("{0,-$colRemaining}" -f $remainingStr) -ForegroundColor Yellow -NoNewline
+            Write-Host ("{0,-$colEndsAt}" -f $endsAtStr) -ForegroundColor Green -NoNewline
         }
         else {
-            Write-Host ("{0,-10}" -f "-") -ForegroundColor DarkGray -NoNewline
-            Write-Host ("{0,-10}" -f "-") -ForegroundColor DarkGray -NoNewline
+            Write-Host ("{0,-$colRemaining}" -f "-") -ForegroundColor DarkGray -NoNewline
+            Write-Host ("{0,-$colEndsAt}" -f "-") -ForegroundColor DarkGray -NoNewline
         }
 
-        Write-Host ("{0,-10}" -f $repeatStr) -ForegroundColor Magenta -NoNewline
+        Write-Host ("{0,-$colRepeat}" -f $repeatStr) -ForegroundColor Magenta -NoNewline
         Write-Host $msgDisplay -ForegroundColor Gray
     }
 
     Write-Host ""
-    Write-Host "  Commands: " -ForegroundColor DarkGray -NoNewline
-    Write-Host "TimerStop <id>" -ForegroundColor White -NoNewline
-    Write-Host " | " -ForegroundColor DarkGray -NoNewline
-    Write-Host "TimerRemove <id>" -ForegroundColor White -NoNewline
-    Write-Host " | " -ForegroundColor DarkGray -NoNewline
-    Write-Host "TimerBg <time>" -ForegroundColor White
-    Write-Host ""
+
+    if ($ShowCommands) {
+        Write-Host "  Commands: " -ForegroundColor DarkGray -NoNewline
+        Write-Host "tstop <id>" -ForegroundColor White -NoNewline
+        Write-Host " | " -ForegroundColor DarkGray -NoNewline
+        Write-Host "tresume <id>" -ForegroundColor White -NoNewline
+        Write-Host " | " -ForegroundColor DarkGray -NoNewline
+        Write-Host "tremove <id>" -ForegroundColor White -NoNewline
+        Write-Host " | " -ForegroundColor DarkGray -NoNewline
+        Write-Host "tlist -w" -ForegroundColor White -NoNewline
+        Write-Host " (watch)" -ForegroundColor DarkGray
+        Write-Host ""
+    }
+
+    return $true
 }
 
-# Alias for quick access
-Set-Alias -Name timers -Value TimerList -Scope Global
+function Show-TimerListWatch {
+    <#
+    .SYNOPSIS
+        Live-updating timer list display. Press any key to exit.
+    #>
+    param(
+        [switch]$All
+    )
+
+    [Console]::CursorVisible = $false
+
+    try {
+        while ($true) {
+            # Clear screen for clean redraw
+            Clear-Host
+
+            # Get timers
+            $timers = @(Sync-TimerData)
+            if (-not $All) {
+                $timers = @($timers | Where-Object { $_.State -eq 'Running' -or $_.State -eq 'Stopped' })
+            }
+
+            if ($timers.Count -eq 0) {
+                Write-Host "`n  No active timers." -ForegroundColor Gray
+                break
+            }
+
+            # Count by state
+            $running = @($timers | Where-Object { $_.State -eq 'Running' }).Count
+            $stopped = @($timers | Where-Object { $_.State -eq 'Stopped' }).Count
+
+            Write-Host ""
+            Write-Host "  BACKGROUND TIMERS " -ForegroundColor Cyan -NoNewline
+            Write-Host "($running running" -ForegroundColor Green -NoNewline
+            if ($stopped -gt 0) { Write-Host ", $stopped stopped" -ForegroundColor Yellow -NoNewline }
+            Write-Host ")" -ForegroundColor Gray
+            Write-Host "  =================" -ForegroundColor DarkCyan
+            Write-Host ""
+
+            # Column widths
+            $colId = 5; $colState = 10; $colDuration = 11; $colRemaining = 11; $colEndsAt = 10; $colRepeat = 8
+
+            # Header
+            Write-Host "  " -NoNewline
+            Write-Host ("{0,-$colId}" -f "ID") -ForegroundColor DarkGray -NoNewline
+            Write-Host ("{0,-$colState}" -f "STATE") -ForegroundColor DarkGray -NoNewline
+            Write-Host ("{0,-$colDuration}" -f "DURATION") -ForegroundColor DarkGray -NoNewline
+            Write-Host ("{0,-$colRemaining}" -f "REMAINING") -ForegroundColor DarkGray -NoNewline
+            Write-Host ("{0,-$colEndsAt}" -f "ENDS AT") -ForegroundColor DarkGray -NoNewline
+            Write-Host ("{0,-$colRepeat}" -f "REPEAT") -ForegroundColor DarkGray -NoNewline
+            Write-Host "MESSAGE" -ForegroundColor DarkGray
+            Write-Host ("  " + ("-" * 75)) -ForegroundColor DarkGray
+
+            foreach ($t in $timers) {
+                $now = Get-Date
+                $endTime = [DateTime]::Parse($t.EndTime)
+                $remaining = $endTime - $now
+
+                $remainingStr = if ($remaining.TotalSeconds -lt 0) { "00:00:00" } else {
+                    "{0:D2}:{1:D2}:{2:D2}" -f [int]$remaining.Hours, $remaining.Minutes, $remaining.Seconds
+                }
+
+                $stateColor = switch ($t.State) { 'Running' { 'Green' } 'Stopped' { 'Yellow' } default { 'Gray' } }
+                $repeatStr = if ($t.RepeatTotal -gt 1) { "$($t.CurrentRun)/$($t.RepeatTotal)" } else { "-" }
+                $msgDisplay = if ($t.Message.Length -gt 20) { $t.Message.Substring(0, 17) + "..." } else { $t.Message }
+                $endsAtStr = if ($t.State -eq 'Running') { $endTime.ToString('HH:mm:ss') } else { "-" }
+                $durationStr = Format-Duration -Seconds $t.Seconds
+
+                if ($t.State -ne 'Running') { $remainingStr = "-"; $endsAtStr = "-" }
+
+                Write-Host "  " -NoNewline
+                Write-Host ("{0,-$colId}" -f $t.Id) -ForegroundColor Cyan -NoNewline
+                Write-Host ("{0,-$colState}" -f $t.State) -ForegroundColor $stateColor -NoNewline
+                Write-Host ("{0,-$colDuration}" -f $durationStr) -ForegroundColor White -NoNewline
+                Write-Host ("{0,-$colRemaining}" -f $remainingStr) -ForegroundColor Yellow -NoNewline
+                Write-Host ("{0,-$colEndsAt}" -f $endsAtStr) -ForegroundColor Green -NoNewline
+                Write-Host ("{0,-$colRepeat}" -f $repeatStr) -ForegroundColor Magenta -NoNewline
+                Write-Host $msgDisplay -ForegroundColor Gray
+            }
+
+            Write-Host ""
+            Write-Host "  Press any key to exit watch mode..." -ForegroundColor DarkGray
+
+            # Check for keypress (1 second loop)
+            $waited = 0
+            while ($waited -lt 1000) {
+                if ([Console]::KeyAvailable) {
+                    [Console]::ReadKey($true) | Out-Null
+                    Write-Host ""
+                    return
+                }
+                Start-Sleep -Milliseconds 100
+                $waited += 100
+            }
+        }
+    }
+    finally {
+        [Console]::CursorVisible = $true
+    }
+}
+
+# Short aliases for quick access
+Set-Alias -Name t -Value Timer -Scope Global
+Set-Alias -Name tbg -Value TimerBg -Scope Global
+Set-Alias -Name tlist -Value TimerList -Scope Global
+Set-Alias -Name tstop -Value TimerStop -Scope Global
+Set-Alias -Name tresume -Value TimerResume -Scope Global
+Set-Alias -Name tremove -Value TimerRemove -Scope Global
 
 function TimerStop {
     <#
@@ -339,7 +500,7 @@ function TimerStop {
             }
 
             # Save remaining seconds for resume
-            $endTime = [DateTime]::ParseExact($t.EndTime, 'o', $null)
+            $endTime = [DateTime]::Parse($t.EndTime)
             $remaining = [int]($endTime - (Get-Date)).TotalSeconds
             if ($remaining -lt 0) { $remaining = 0 }
             $t | Add-Member -NotePropertyName 'RemainingSeconds' -NotePropertyValue $remaining -Force

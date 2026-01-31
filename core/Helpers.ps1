@@ -44,11 +44,23 @@ function ConvertTo-Seconds {
 function New-TimerId {
     <#
     .SYNOPSIS
-        Generates a short unique timer ID (4 chars).
+        Generates a sequential timer ID (1, 2, 3, ...).
     #>
-    $chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-    $id = -join (1..4 | ForEach-Object { $chars[(Get-Random -Maximum $chars.Length)] })
-    return $id
+    $timers = @(Get-TimerData)
+    if ($timers.Count -eq 0) {
+        return "1"
+    }
+
+    # Find highest numeric ID
+    $maxId = 0
+    foreach ($t in $timers) {
+        if ($t.Id -match '^\d+$') {
+            $num = [int]$t.Id
+            if ($num -gt $maxId) { $maxId = $num }
+        }
+    }
+
+    return [string]($maxId + 1)
 }
 
 function Get-TimerData {
@@ -177,7 +189,7 @@ function Sync-TimerData {
             # Only mark as lost if the timer should have already ended
             if ($timer.State -eq 'Running') {
                 try {
-                    $endTime = [DateTime]::ParseExact($timer.EndTime, 'o', $null)
+                    $endTime = [DateTime]::Parse($timer.EndTime)
                     if ((Get-Date) -gt $endTime) {
                         # Timer expired without job - mark as lost
                         $timer.State = 'Lost'
