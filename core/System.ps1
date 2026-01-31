@@ -8,7 +8,7 @@ function Show-IP {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
     # 1. Collect Local Info (Instant)
-    $Config = Get-NetIPConfiguration | Where-Object { $_.IPv4Address -ne $null } | Select-Object -First 1
+    $Config = Get-NetIPConfiguration | Where-Object { $null -ne $_.IPv4Address } | Select-Object -First 1
     $Adapter = Get-NetAdapter -InterfaceIndex $Config.InterfaceIndex
     $Wifi = netsh wlan show interfaces | Select-String "Signal","SSID" | Out-String
 
@@ -53,7 +53,7 @@ function Show-IP {
     Write-Host "------------------------`n"
 }
 
-function Disk-Space {
+function DiskSpace {
     <#
     .SYNOPSIS
         Displays an aligned dashboard with Drive, Type, Label, Total, Free, and Usage %.

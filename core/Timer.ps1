@@ -65,21 +65,9 @@ function timer {
     }
 }
 
-function btimer {
-    <#
-    .SYNOPSIS
-        Starts a timer in a new PowerShell window.
-    .PARAMETER Time
-        The duration (e.g., 1h20m, 90s, 10m).
-    .PARAMETER Msg
-        Optional message to show when time is up.
-    #>
-    param($Time, $Msg = "Time is up!")
-    # Starts a new powershell window, runs the timer, and closes when done
-    start-process powershell -ArgumentList "-NoExit", "-Command", "timer $Time '$Msg'; exit" -WindowStyle Normal
-}
 
-function timer-bg {
+
+function TimerBg {
     <#
     .SYNOPSIS
         Runs a timer in a background job.
@@ -105,7 +93,7 @@ function timer-bg {
     Write-Host "Timer for $Time running in background..." -ForegroundColor Cyan
 }
 
-function timer-list {
+function TimerList {
     <#
     .SYNOPSIS
         Shows all active background timers.
@@ -113,7 +101,7 @@ function timer-list {
     Get-Job -Name "TimerJob*" | Select-Object Id, State, @{Name="Started";Expression={$_.PSBeginTime}}
 }
 
-function timer-stop {
+function TimerStop {
     <#
     .SYNOPSIS
         Cancels and removes all background timers.
