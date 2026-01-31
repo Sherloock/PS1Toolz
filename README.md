@@ -23,7 +23,7 @@ Modular PowerShell environment for Full Stack development and System Management.
 ## Usage
 
 - Type `??` in PowerShell to see all available commands.
-- Type `timer` to see timer-specific commands.
+- Type `t` to see timer-specific commands.
 - Type `Reload` to hot-reload all scripts after making changes.
 
 ## Functions
@@ -35,13 +35,13 @@ Modular PowerShell environment for Full Stack development and System Management.
 - `Disk-Space` - Disk usage dashboard with color-coded warnings
 - `Fast` - Internet speed test using Speedtest CLI
 
-### Timer (type `timer` for help)
+### Timer (type `t` for help)
 
-- `Timer <time>` - Foreground countdown (blocks terminal)
-- `TimerBg <time> [-m msg] [-r N]` - Background timer with optional repeat
-- `TimerList [-a]` - List active timers
-- `TimerStop [id|all]` - Stop timer(s)
-- `TimerRemove [id|done|all]` - Remove timer(s)
+- `t <time> [-m msg] [-r N]` - Start a background timer with optional repeat
+- `tl [-a] [-w]` - List active timers (-a all, -w watch)
+- `ts [id|all]` - Stop/pause timer(s)
+- `tr [id|all]` - Resume timer(s)
+- `td [id|done|all]` - Remove timer(s)
 
 ### Dev
 

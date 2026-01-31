@@ -16,13 +16,8 @@ function Show-TimerHelp {
     Write-Host ""
     Write-Host "  " -NoNewline
     Write-Host "t <time>" -ForegroundColor Yellow -NoNewline
-    Write-Host " [-m 'msg'] [-r N]" -ForegroundColor Gray
-    Write-Host "      Background timer with optional repeat" -ForegroundColor DarkGray
-    Write-Host ""
-    Write-Host "  " -NoNewline
-    Write-Host "Timer <time>" -ForegroundColor Yellow -NoNewline
-    Write-Host " [-m 'msg']" -ForegroundColor Gray
-    Write-Host "      Foreground countdown (blocks terminal)" -ForegroundColor DarkGray
+    Write-Host " [msg] [repeat]" -ForegroundColor Gray
+    Write-Host "      Start a background timer with optional message & repeat" -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  " -NoNewline
     Write-Host "tl" -ForegroundColor Yellow -NoNewline
@@ -44,32 +39,51 @@ function Show-TimerHelp {
     Write-Host " [id|done|all]" -ForegroundColor Gray
     Write-Host "      Remove timer(s) from list" -ForegroundColor DarkGray
     Write-Host ""
+    Write-Host "  " -NoNewline
+    Write-Host "tc" -ForegroundColor Yellow
+    Write-Host "      Clear all Lost and Completed timers" -ForegroundColor DarkGray
+    Write-Host ""
     Write-Host "  Time formats: " -ForegroundColor DarkGray -NoNewline
     Write-Host "1h30m, 25m, 90s, 1h20m30s" -ForegroundColor White
     Write-Host ""
     Write-Host "  Examples:" -ForegroundColor DarkGray
-    Write-Host "    t 25m -m 'Coffee break'" -ForegroundColor Gray
-    Write-Host "    t 1h -r 3 -m 'Stretch'" -ForegroundColor Gray
-    Write-Host "    ts 1" -ForegroundColor Gray
+    Write-Host "    t 25m                      " -ForegroundColor Gray -NoNewline
+    Write-Host "# Simple 25 min timer" -ForegroundColor DarkGray
+    Write-Host "    t 30m Water                " -ForegroundColor Gray -NoNewline
+    Write-Host "# Hydration reminder" -ForegroundColor DarkGray
+    Write-Host "    t 1h30m 'Stand up' 4       " -ForegroundColor Gray -NoNewline
+    Write-Host "# Repeat 4 times" -ForegroundColor DarkGray
+    Write-Host "    t 45m -m 'Meeting' -r 2    " -ForegroundColor Gray -NoNewline
+    Write-Host "# Named params" -ForegroundColor DarkGray
+    Write-Host "    t 8h Lunch                 " -ForegroundColor Gray -NoNewline
+    Write-Host "# End of workday" -ForegroundColor DarkGray
     Write-Host ""
 }
 
 # ============================================================================
-# FOREGROUND TIMER
+# TIMER FUNCTIONS
 # ============================================================================
 
 function Timer {
     <#
     .SYNOPSIS
-        Starts a countdown timer or shows help. Formats: '1h20m', '90s', '10m10s'.
+        Starts a background timer with optional repeat. Use tl to view all timers.
     .PARAMETER Time
-        The duration (e.g., 1h20m, 90s, 10m, 5s). Omit to see timer commands.
+        The duration (e.g., 1h20m, 90s, 10m, 3h). Omit to see help.
     .PARAMETER Message
         Optional message to show when time is up.
+    .PARAMETER Repeat
+        Number of times to repeat the timer (e.g., -r 3 repeats 3 times total).
+    .EXAMPLE
+        t 25m
+        t 30m Water
+        t 1h30m 'Stand up' 4
+        t 45m -m 'Meeting' -r 2
     #>
     param(
         [Parameter(Position=0)][string]$Time,
-        [Alias('m')][string]$Message = "Time is up!"
+        [Parameter(Position=1)][Alias('m')][string]$Message = "Time is up!",
+        [Parameter(Position=2)][Alias('r')][int]$Repeat = 1
     )
 
     # Show help if no time provided
@@ -77,68 +91,6 @@ function Timer {
         Show-TimerHelp
         return
     }
-
-    $seconds = ConvertTo-Seconds -Time $Time
-
-    if ($seconds -le 0) {
-        Write-Host "Invalid time format. Use 1h20m, 90s, etc." -ForegroundColor Red
-        return
-    }
-
-    $endTime = (Get-Date).AddSeconds($seconds)
-    Write-Host "`nTimer started for: $Time" -ForegroundColor Cyan
-    Write-Host "Message: $Message" -ForegroundColor Gray
-    Write-Host "Press Ctrl+C to stop.`n"
-
-    try {
-        while ($seconds -gt 0) {
-            $diff = $endTime - (Get-Date)
-            $seconds = [int]$diff.TotalSeconds
-
-            if ($seconds -lt 0) { break }
-
-            $display = "{0:D2}:{1:D2}:{2:D2}" -f $diff.Hours, $diff.Minutes, $diff.Seconds
-            Write-Host "`r[ COUNTDOWN: $display ] " -NoNewline -ForegroundColor Yellow
-            Start-Sleep -Seconds 1
-        }
-
-        Write-Host "`r[ COUNTDOWN: 00:00:00 ] " -ForegroundColor Red
-        [console]::beep(440, 500)
-        Write-Host "`n`n*******************************" -ForegroundColor Green
-        Write-Host " $Message" -ForegroundColor White -BackgroundColor DarkGreen
-        Write-Host "*******************************`n"
-
-        $wshell = New-Object -ComObject WScript.Shell
-        $wshell.Popup($Message, 0, "Timer Finished", 0x40) | Out-Null
-    }
-    catch {
-        Write-Host "`n`nTimer stopped." -ForegroundColor Gray
-    }
-}
-
-# ============================================================================
-# BACKGROUND TIMER FUNCTIONS
-# ============================================================================
-
-function TimerBg {
-    <#
-    .SYNOPSIS
-        Starts a background timer with optional repeat. Use TimerList to view all timers.
-    .PARAMETER Time
-        The duration (e.g., 1h20m, 90s, 10m, 3h).
-    .PARAMETER Message
-        Optional message to show when time is up.
-    .PARAMETER Repeat
-        Number of times to repeat the timer (e.g., -r 3 repeats 3 times total).
-    .EXAMPLE
-        TimerBg 25m -m "Break time!"
-        TimerBg 1h30m -r 3 -m "Hydration reminder"
-    #>
-    param(
-        [Parameter(Mandatory=$true)][string]$Time,
-        [Alias('m')][string]$Message = "Time is up!",
-        [Alias('r')][int]$Repeat = 1
-    )
 
     $seconds = ConvertTo-Seconds -Time $Time
 
@@ -229,7 +181,7 @@ function Show-TimerListOnce {
 
     if ($timers.Count -eq 0) {
         Write-Host "`n  No timers found." -ForegroundColor Gray
-        Write-Host "  Use 'TimerBg <time>' to create one.`n" -ForegroundColor DarkGray
+        Write-Host "  Use 't <time>' to create one.`n" -ForegroundColor DarkGray
         return $false
     }
 
@@ -341,15 +293,16 @@ function Show-TimerListOnce {
     Write-Host ""
 
     if ($ShowCommands) {
-        Write-Host "  Commands: " -ForegroundColor DarkGray -NoNewline
+        Write-Host "  Stop " -ForegroundColor DarkGray -NoNewline
         Write-Host "ts <id>" -ForegroundColor White -NoNewline
-        Write-Host " | " -ForegroundColor DarkGray -NoNewline
+        Write-Host " | Resume " -ForegroundColor DarkGray -NoNewline
         Write-Host "tr <id>" -ForegroundColor White -NoNewline
-        Write-Host " | " -ForegroundColor DarkGray -NoNewline
+        Write-Host " | Delete " -ForegroundColor DarkGray -NoNewline
         Write-Host "td <id>" -ForegroundColor White -NoNewline
-        Write-Host " | " -ForegroundColor DarkGray -NoNewline
-        Write-Host "tl -w" -ForegroundColor White -NoNewline
-        Write-Host " (watch)" -ForegroundColor DarkGray
+        Write-Host " | Clear " -ForegroundColor DarkGray -NoNewline
+        Write-Host "tc" -ForegroundColor White -NoNewline
+        Write-Host " | Watch " -ForegroundColor DarkGray -NoNewline
+        Write-Host "tl -w" -ForegroundColor White
         Write-Host ""
     }
 
@@ -462,11 +415,12 @@ function Show-TimerListWatch {
 }
 
 # Short aliases for quick access
-Set-Alias -Name t -Value TimerBg -Scope Global
+Set-Alias -Name t -Value Timer -Scope Global
 Set-Alias -Name tl -Value TimerList -Scope Global
 Set-Alias -Name ts -Value TimerStop -Scope Global
 Set-Alias -Name tr -Value TimerResume -Scope Global
 Set-Alias -Name td -Value TimerRemove -Scope Global
+Set-Alias -Name tc -Value TimerClear -Scope Global
 
 function TimerStop {
     <#
@@ -723,4 +677,42 @@ function TimerRemove {
         Write-Host "[$Id]" -ForegroundColor Cyan -NoNewline
         Write-Host " removed.`n" -ForegroundColor Yellow
     }
+}
+
+function TimerClear {
+    <#
+    .SYNOPSIS
+        Clears all Lost and Completed timers from the list.
+    .EXAMPLE
+        TimerClear
+        tc
+    #>
+    $timers = @(Get-TimerData)
+
+    if ($timers.Count -eq 0) {
+        Write-Host "`n  No timers to clear.`n" -ForegroundColor Gray
+        return
+    }
+
+    $toKeep = @()
+    $cleared = 0
+
+    foreach ($t in $timers) {
+        if ($t.State -eq 'Lost' -or $t.State -eq 'Completed') {
+            $jobName = "Timer_$($t.Id)"
+            Remove-Job -Name $jobName -Force -ErrorAction SilentlyContinue
+            $cleared++
+        }
+        else {
+            $toKeep += $t
+        }
+    }
+
+    if ($cleared -eq 0) {
+        Write-Host "`n  No Lost or Completed timers to clear.`n" -ForegroundColor Gray
+        return
+    }
+
+    Save-TimerData -Timers $toKeep
+    Write-Host "`n  Cleared $cleared timer(s).`n" -ForegroundColor Yellow
 }

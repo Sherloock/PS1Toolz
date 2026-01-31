@@ -223,11 +223,35 @@ function Start-TimerJob {
     $jobName = "Timer_$($Timer.Id)"
 
     Start-Job -Name $jobName -ScriptBlock {
-        param($seconds, $message, $timerId)
+        param($seconds, $message, $timerId, $duration, $startTime, $repeatTotal, $currentRun)
 
         Start-Sleep -Seconds $seconds
         [console]::beep(440, 500)
+
+        # Format start time
+        $startDt = [DateTime]::Parse($startTime)
+        $startStr = $startDt.ToString('HH:mm:ss')
+        $endStr = (Get-Date).ToString('HH:mm:ss')
+
+        # Build detailed body
+        $body = @(
+            "Timer #$timerId completed!"
+            ""
+            "Duration: $duration"
+            "Started:  $startStr"
+            "Finished: $endStr"
+        )
+
+        if ($repeatTotal -gt 1) {
+            $body += "Run:      $currentRun of $repeatTotal"
+        }
+
+        $bodyText = $body -join "`n"
+
+        # Title shows message first
+        $title = "$message"
+
         $popup = New-Object -ComObject WScript.Shell
-        $popup.Popup($message, 0, "Timer [$timerId]", 64) | Out-Null
-    } -ArgumentList $Timer.Seconds, $Timer.Message, $Timer.Id | Out-Null
+        $popup.Popup($bodyText, 0, $title, 64) | Out-Null
+    } -ArgumentList $Timer.Seconds, $Timer.Message, $Timer.Id, $Timer.Duration, $Timer.StartTime, $Timer.RepeatTotal, $Timer.CurrentRun | Out-Null
 }
