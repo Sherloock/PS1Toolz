@@ -16,31 +16,31 @@ function Show-TimerHelp {
     Write-Host ""
     Write-Host "  " -NoNewline
     Write-Host "t <time>" -ForegroundColor Yellow -NoNewline
-    Write-Host " [-m 'msg']" -ForegroundColor Gray
-    Write-Host "      Foreground countdown (blocks terminal)" -ForegroundColor DarkGray
-    Write-Host ""
-    Write-Host "  " -NoNewline
-    Write-Host "tbg <time>" -ForegroundColor Yellow -NoNewline
     Write-Host " [-m 'msg'] [-r N]" -ForegroundColor Gray
     Write-Host "      Background timer with optional repeat" -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  " -NoNewline
-    Write-Host "tlist" -ForegroundColor Yellow -NoNewline
+    Write-Host "Timer <time>" -ForegroundColor Yellow -NoNewline
+    Write-Host " [-m 'msg']" -ForegroundColor Gray
+    Write-Host "      Foreground countdown (blocks terminal)" -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "  " -NoNewline
+    Write-Host "tl" -ForegroundColor Yellow -NoNewline
     Write-Host " [-a] [-w]" -ForegroundColor Gray
     Write-Host "      List active timers (-a all, -w live watch)" -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  " -NoNewline
-    Write-Host "tstop" -ForegroundColor Yellow -NoNewline
+    Write-Host "ts" -ForegroundColor Yellow -NoNewline
     Write-Host " [id|all]" -ForegroundColor Gray
     Write-Host "      Pause specific timer or all (can resume)" -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  " -NoNewline
-    Write-Host "tresume" -ForegroundColor Yellow -NoNewline
+    Write-Host "tr" -ForegroundColor Yellow -NoNewline
     Write-Host " [id|all]" -ForegroundColor Gray
     Write-Host "      Resume stopped timer(s)" -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  " -NoNewline
-    Write-Host "tremove" -ForegroundColor Yellow -NoNewline
+    Write-Host "td" -ForegroundColor Yellow -NoNewline
     Write-Host " [id|done|all]" -ForegroundColor Gray
     Write-Host "      Remove timer(s) from list" -ForegroundColor DarkGray
     Write-Host ""
@@ -49,8 +49,8 @@ function Show-TimerHelp {
     Write-Host ""
     Write-Host "  Examples:" -ForegroundColor DarkGray
     Write-Host "    t 25m -m 'Coffee break'" -ForegroundColor Gray
-    Write-Host "    tbg 1h -r 3 -m 'Stretch'" -ForegroundColor Gray
-    Write-Host "    tstop 1" -ForegroundColor Gray
+    Write-Host "    t 1h -r 3 -m 'Stretch'" -ForegroundColor Gray
+    Write-Host "    ts 1" -ForegroundColor Gray
     Write-Host ""
 }
 
@@ -342,13 +342,13 @@ function Show-TimerListOnce {
 
     if ($ShowCommands) {
         Write-Host "  Commands: " -ForegroundColor DarkGray -NoNewline
-        Write-Host "tstop <id>" -ForegroundColor White -NoNewline
+        Write-Host "ts <id>" -ForegroundColor White -NoNewline
         Write-Host " | " -ForegroundColor DarkGray -NoNewline
-        Write-Host "tresume <id>" -ForegroundColor White -NoNewline
+        Write-Host "tr <id>" -ForegroundColor White -NoNewline
         Write-Host " | " -ForegroundColor DarkGray -NoNewline
-        Write-Host "tremove <id>" -ForegroundColor White -NoNewline
+        Write-Host "td <id>" -ForegroundColor White -NoNewline
         Write-Host " | " -ForegroundColor DarkGray -NoNewline
-        Write-Host "tlist -w" -ForegroundColor White -NoNewline
+        Write-Host "tl -w" -ForegroundColor White -NoNewline
         Write-Host " (watch)" -ForegroundColor DarkGray
         Write-Host ""
     }
@@ -462,12 +462,11 @@ function Show-TimerListWatch {
 }
 
 # Short aliases for quick access
-Set-Alias -Name t -Value Timer -Scope Global
-Set-Alias -Name tbg -Value TimerBg -Scope Global
-Set-Alias -Name tlist -Value TimerList -Scope Global
-Set-Alias -Name tstop -Value TimerStop -Scope Global
-Set-Alias -Name tresume -Value TimerResume -Scope Global
-Set-Alias -Name tremove -Value TimerRemove -Scope Global
+Set-Alias -Name t -Value TimerBg -Scope Global
+Set-Alias -Name tl -Value TimerList -Scope Global
+Set-Alias -Name ts -Value TimerStop -Scope Global
+Set-Alias -Name tr -Value TimerResume -Scope Global
+Set-Alias -Name td -Value TimerRemove -Scope Global
 
 function TimerStop {
     <#
