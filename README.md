@@ -62,7 +62,7 @@ The `config.ps1` file is gitignored and won't be committed.
 
 - `Pass` - Secure password generator
 - `PortKill` - Kill process by port number
-- `CleanNode` - Find and remove node_modules folders
+- `NodeKill` - Find and remove node_modules folders (sorted by size)
 - `Go` - Quick navigation bookmarks (requires config.ps1)
 
 ### Media

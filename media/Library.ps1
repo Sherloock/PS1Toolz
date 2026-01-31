@@ -6,8 +6,13 @@ function Size {
         Lists files and folders sorted by size in descending order.
     .PARAMETER Depth
         Defines recursion depth (0 = current folder only).
+    .PARAMETER MinSize
+        Minimum size threshold to display (default: 1MB). Use 0 to show all.
     #>
-    param ([int]$Depth = 0)
+    param (
+        [int]$Depth = $global:Config.SizeDefaults.Depth,
+        [long]$MinSize = $global:Config.SizeDefaults.MinSize
+    )
 
     $basePath = (Get-Location).Path
     $items = Get-ChildItem -Depth $Depth -ErrorAction SilentlyContinue | ForEach-Object {
@@ -32,10 +37,13 @@ function Size {
     } | Sort-Object RawSize -Descending
 
     $totalBytes = ($items | Measure-Object -Property RawSize -Sum).Sum
+    $filteredItems = $items | Where-Object { $_.RawSize -ge $MinSize }
+    $filteredCount = $items.Count - $filteredItems.Count
+
     if ($Depth -gt 0) {
-        Write-SizeTable -Items $items -GroupByParent -TotalBytes $totalBytes
+        Write-SizeTable -Items $filteredItems -GroupByParent -TotalBytes $totalBytes -FilteredCount $filteredCount -MinSize $MinSize
     } else {
-        Write-SizeTable -Items $items -TotalBytes $totalBytes
+        Write-SizeTable -Items $filteredItems -TotalBytes $totalBytes -FilteredCount $filteredCount -MinSize $MinSize
     }
 }
 
@@ -86,7 +94,9 @@ function Write-SizeTable {
     param(
         [array]$Items,
         [switch]$GroupByParent,
-        [long]$TotalBytes = 0
+        [long]$TotalBytes = 0,
+        [int]$FilteredCount = 0,
+        [long]$MinSize = 0
     )
 
     if (-not $Items -or $Items.Count -eq 0) {
@@ -143,6 +153,10 @@ function Write-SizeTable {
         Write-Host ("-" * 50) -ForegroundColor DarkGray
         Write-Host ("{0,$sizeWidth}  " -f (Get-ReadableSize -Bytes $finalTotal)) -NoNewline -ForegroundColor Green
         Write-Host "TOTAL" -ForegroundColor Green
+    }
+
+    if ($FilteredCount -gt 0) {
+        Write-Host "  ($FilteredCount items < $(Get-ReadableSize -Bytes $MinSize) hidden)" -ForegroundColor DarkGray
     }
 
     Write-Host ""

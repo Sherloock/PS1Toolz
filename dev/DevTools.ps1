@@ -24,7 +24,7 @@ function PortKill {
     }
 }
 
-function CleanNode {
+function NodeKill {
     <#
     .SYNOPSIS
         Scans for top-level node_modules only. Ignores nested ones inside dependencies.
@@ -41,15 +41,18 @@ function CleanNode {
     }
 
     $list = @()
-    $index = 1
     foreach ($f in $folders) {
         # Calculate total size of this project's node_modules
         $sizeBytes = (Get-ChildItem -LiteralPath $f.FullName -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
         $sizeMB = [math]::Round($sizeBytes / 1MB, 2)
 
-        $list += [PSCustomObject]@{ ID = $index; Size = $sizeMB; Path = $f.FullName }
-        $index++
+        $list += [PSCustomObject]@{ Size = $sizeMB; Path = $f.FullName }
     }
+
+    # Sort by size descending and assign IDs
+    $list = $list | Sort-Object -Property Size -Descending
+    $index = 1
+    $list = $list | ForEach-Object { $_ | Add-Member -NotePropertyName ID -NotePropertyValue $index -PassThru; $index++ }
 
     Write-Host "`nID  | SIZE (MB) | PROJECT PATH" -ForegroundColor White
     Write-Host ("-" * 70)

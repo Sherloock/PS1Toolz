@@ -8,6 +8,12 @@ $global:Config = @{
         "D:\shows"
     )
 
+    # Size function defaults
+    SizeDefaults = @{
+        Depth   = 0       # 0 = current folder only
+        MinSize = 1MB     # Hide items smaller than this
+    }
+
     # Bookmarks for the Go function (quick navigation)
     Bookmarks = [ordered]@{
         "c"       = "C:\"
