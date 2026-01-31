@@ -1,6 +1,9 @@
 # User config (contains local paths)
 config.ps1
 
+# Cursor AI rules (local dev preferences)
+# .cursorrules
+
 # Logs
 *.log
 
