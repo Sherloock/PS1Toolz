@@ -365,21 +365,35 @@ function Show-TimerListWatch {
         [switch]$All
     )
 
+    # ANSI color codes
+    $esc = [char]27
+    $reset = "$esc[0m"
+    $cyan = "$esc[36m"
+    $green = "$esc[32m"
+    $yellow = "$esc[33m"
+    $magenta = "$esc[35m"
+    $white = "$esc[97m"
+    $gray = "$esc[90m"
+    $darkCyan = "$esc[36m"
+
     [Console]::CursorVisible = $false
 
     try {
         while ($true) {
-            # Clear screen for clean redraw
-            Clear-Host
-
-            # Get timers
+            # Get timers first (before clearing)
             $timers = @(Sync-TimerData)
             if (-not $All) {
                 $timers = @($timers | Where-Object { $_.State -eq 'Running' -or $_.State -eq 'Stopped' })
             }
 
+            # Build entire output as single string
+            $sb = [System.Text.StringBuilder]::new()
+
             if ($timers.Count -eq 0) {
-                Write-Host "`n  No active timers." -ForegroundColor Gray
+                [void]$sb.AppendLine("")
+                [void]$sb.AppendLine("${gray}  No active timers.${reset}")
+                Clear-Host
+                [Console]::Write($sb.ToString())
                 break
             }
 
@@ -387,27 +401,19 @@ function Show-TimerListWatch {
             $running = @($timers | Where-Object { $_.State -eq 'Running' }).Count
             $stopped = @($timers | Where-Object { $_.State -eq 'Stopped' }).Count
 
-            Write-Host ""
-            Write-Host "  BACKGROUND TIMERS " -ForegroundColor Cyan -NoNewline
-            Write-Host "($running running" -ForegroundColor Green -NoNewline
-            if ($stopped -gt 0) { Write-Host ", $stopped stopped" -ForegroundColor Yellow -NoNewline }
-            Write-Host ")" -ForegroundColor Gray
-            Write-Host "  =================" -ForegroundColor DarkCyan
-            Write-Host ""
+            [void]$sb.AppendLine("")
+            $stoppedPart = if ($stopped -gt 0) { "${yellow}, $stopped stopped${reset}" } else { "" }
+            [void]$sb.AppendLine("${cyan}  BACKGROUND TIMERS ${green}($running running${stoppedPart}${green})${reset}")
+            [void]$sb.AppendLine("${darkCyan}  ===================${reset}")
+            [void]$sb.AppendLine("")
 
             # Column widths
             $colId = 5; $colState = 10; $colDuration = 11; $colRemaining = 11; $colEndsAt = 10; $colRepeat = 8
 
             # Header
-            Write-Host "  " -NoNewline
-            Write-Host ("{0,-$colId}" -f "ID") -ForegroundColor DarkGray -NoNewline
-            Write-Host ("{0,-$colState}" -f "STATE") -ForegroundColor DarkGray -NoNewline
-            Write-Host ("{0,-$colDuration}" -f "DURATION") -ForegroundColor DarkGray -NoNewline
-            Write-Host ("{0,-$colRemaining}" -f "REMAINING") -ForegroundColor DarkGray -NoNewline
-            Write-Host ("{0,-$colEndsAt}" -f "ENDS AT") -ForegroundColor DarkGray -NoNewline
-            Write-Host ("{0,-$colRepeat}" -f "REPEAT") -ForegroundColor DarkGray -NoNewline
-            Write-Host "MESSAGE" -ForegroundColor DarkGray
-            Write-Host ("  " + ("-" * 75)) -ForegroundColor DarkGray
+            $hdr = "  {0,-$colId}{1,-$colState}{2,-$colDuration}{3,-$colRemaining}{4,-$colEndsAt}{5,-$colRepeat}MESSAGE" -f "ID", "STATE", "DURATION", "REMAINING", "ENDS AT", "REPEAT"
+            [void]$sb.AppendLine("${gray}$hdr${reset}")
+            [void]$sb.AppendLine("${gray}  $("-" * 75)${reset}")
 
             foreach ($t in $timers) {
                 $now = Get-Date
@@ -418,7 +424,7 @@ function Show-TimerListWatch {
                     "{0:D2}:{1:D2}:{2:D2}" -f [int]$remaining.Hours, $remaining.Minutes, $remaining.Seconds
                 }
 
-                $stateColor = switch ($t.State) { 'Running' { 'Green' } 'Stopped' { 'Yellow' } default { 'Gray' } }
+                $stateColor = switch ($t.State) { 'Running' { $green } 'Stopped' { $yellow } default { $gray } }
                 $repeatStr = if ($t.RepeatTotal -gt 1) { "$($t.CurrentRun)/$($t.RepeatTotal)" } else { "-" }
                 $msgDisplay = if ($t.Message.Length -gt 20) { $t.Message.Substring(0, 17) + "..." } else { $t.Message }
                 $endsAtStr = if ($t.State -eq 'Running') { $endTime.ToString('HH:mm:ss') } else { "-" }
@@ -426,18 +432,16 @@ function Show-TimerListWatch {
 
                 if ($t.State -ne 'Running') { $remainingStr = "-"; $endsAtStr = "-" }
 
-                Write-Host "  " -NoNewline
-                Write-Host ("{0,-$colId}" -f $t.Id) -ForegroundColor Cyan -NoNewline
-                Write-Host ("{0,-$colState}" -f $t.State) -ForegroundColor $stateColor -NoNewline
-                Write-Host ("{0,-$colDuration}" -f $durationStr) -ForegroundColor White -NoNewline
-                Write-Host ("{0,-$colRemaining}" -f $remainingStr) -ForegroundColor Yellow -NoNewline
-                Write-Host ("{0,-$colEndsAt}" -f $endsAtStr) -ForegroundColor Green -NoNewline
-                Write-Host ("{0,-$colRepeat}" -f $repeatStr) -ForegroundColor Magenta -NoNewline
-                Write-Host $msgDisplay -ForegroundColor Gray
+                $line = "  ${cyan}{0,-$colId}${reset}${stateColor}{1,-$colState}${reset}${white}{2,-$colDuration}${reset}${yellow}{3,-$colRemaining}${reset}${green}{4,-$colEndsAt}${reset}${magenta}{5,-$colRepeat}${reset}${gray}{6}${reset}" -f $t.Id, $t.State, $durationStr, $remainingStr, $endsAtStr, $repeatStr, $msgDisplay
+                [void]$sb.AppendLine($line)
             }
 
-            Write-Host ""
-            Write-Host "  Press any key to exit watch mode..." -ForegroundColor DarkGray
+            [void]$sb.AppendLine("")
+            [void]$sb.AppendLine("${gray}  Press any key to exit watch mode...${reset}")
+
+            # Clear and write in one go (minimizes flicker)
+            Clear-Host
+            [Console]::Write($sb.ToString())
 
             # Check for keypress (1 second loop)
             $waited = 0
