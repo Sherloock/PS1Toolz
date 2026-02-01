@@ -33,6 +33,7 @@ Some functions require user-specific paths. To configure:
 
 - `MediaPaths` - Array of paths for `Movies` function
 - `Bookmarks` - Hashtable of shortcuts for `Go` function
+- `NodeKillPaths` - Hashtable of shortcuts for `NodeKill` function
 
 The `config.ps1` file is gitignored and won't be committed.
 
@@ -80,7 +81,7 @@ t "((25m work, 5m rest)x4, 20m break)x2"       # Nested: 2 full pomodoro sets
 
 - `Pass` - Secure password generator
 - `PortKill -Port <n>` - Kill process by port number
-- `NodeKill` - Find and remove node_modules folders (sorted by size, with totals)
+- `NodeKill [path]` - Find and remove node_modules folders (sorted by size, with totals). Accepts path or shortcut from `NodeKillPaths`
 - `Go` - Quick navigation bookmarks (requires config.ps1)
 
 ### Media

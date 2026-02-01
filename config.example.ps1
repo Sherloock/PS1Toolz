@@ -22,6 +22,12 @@ $global:Config = @{
         "proj"    = "D:\Projects"
     }
 
+    # Shortcuts for NodeKill function (node_modules cleanup)
+    # Usage: nodekill proj
+    NodeKillPaths = [ordered]@{
+        "proj" = "D:\Projects"
+    }
+
     # Timer sequence presets
     # Syntax: (duration label, duration label)xN, duration label
     # Use with: t <preset-name> or tpre for interactive picker

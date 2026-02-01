@@ -129,6 +129,50 @@ Describe "NodeKill" {
         }
     }
 
+    Context "path parameter and shortcuts" {
+        BeforeAll {
+            # Setup mock config
+            $global:Config = @{
+                NodeKillPaths = [ordered]@{
+                    "test" = "$TestDrive\testproject"
+                }
+            }
+
+            Mock Get-ChildItem { @() } -ParameterFilter { $Filter -eq "node_modules" }
+            Mock Test-Path { $true }
+        }
+
+        AfterAll {
+            $global:Config = $null
+        }
+
+        It "accepts shortcut from config" {
+            # Create test directory
+            New-Item -Path "$TestDrive\testproject" -ItemType Directory -Force | Out-Null
+
+            NodeKill -Path "test"
+            Should -Invoke Get-ChildItem -ParameterFilter { $Path -eq "$TestDrive\testproject" -and $Filter -eq "node_modules" }
+        }
+
+        It "accepts direct path" {
+            New-Item -Path "$TestDrive\directpath" -ItemType Directory -Force | Out-Null
+
+            NodeKill -Path "$TestDrive\directpath"
+            Should -Invoke Get-ChildItem -ParameterFilter { $Path -eq "$TestDrive\directpath" -and $Filter -eq "node_modules" }
+        }
+
+        It "handles invalid shortcut gracefully" {
+            Mock Test-Path { $false }
+            { NodeKill -Path "nonexistent" } | Should -Not -Throw
+        }
+
+        It "shows available shortcuts on invalid input" {
+            Mock Test-Path { $false }
+            # Should not throw, just display message
+            { NodeKill -Path "badpath" } | Should -Not -Throw
+        }
+    }
+
     Context "when no node_modules exist" {
         BeforeAll {
             Mock Get-ChildItem { @() } -ParameterFilter { $Filter -eq "node_modules" }

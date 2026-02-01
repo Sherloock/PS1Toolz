@@ -32,11 +32,35 @@ function NodeKill {
     <#
     .SYNOPSIS
         Scans for top-level node_modules only. Ignores nested ones inside dependencies.
+    .PARAMETER Path
+        Optional. A path or shortcut (from Config.NodeKillPaths) to scan. Defaults to current directory.
     #>
+    param (
+        [Parameter(Position = 0)]
+        [string]$Path
+    )
+
+    # Resolve path from shortcut or use provided path
+    $scanPath = "."
+    if ($Path) {
+        if ($global:Config -and $global:Config.NodeKillPaths -and $global:Config.NodeKillPaths.Contains($Path)) {
+            $scanPath = $global:Config.NodeKillPaths[$Path]
+            Write-Host "`nUsing shortcut '$Path' -> $scanPath" -ForegroundColor Cyan
+        } elseif (Test-Path $Path) {
+            $scanPath = $Path
+        } else {
+            Write-Host "Path '$Path' not found and not a valid shortcut." -ForegroundColor Red
+            if ($global:Config -and $global:Config.NodeKillPaths) {
+                Write-Host "Available shortcuts: $($global:Config.NodeKillPaths.Keys -join ', ')" -ForegroundColor Yellow
+            }
+            return
+        }
+    }
+
     Write-Host "`nScanning for project node_modules... (Top-level only)" -ForegroundColor Cyan
 
     # This logic finds node_modules but prevents recursing INTO them
-    $folders = Get-ChildItem -Path . -Recurse -Directory -Filter "node_modules" -ErrorAction SilentlyContinue |
+    $folders = Get-ChildItem -Path $scanPath -Recurse -Directory -Filter "node_modules" -ErrorAction SilentlyContinue |
                Where-Object { $_.FullName -notmatch 'node_modules.+node_modules' }
 
     if (-not $folders) {
