@@ -476,12 +476,24 @@ function TimerWatch {
             $timer = $activeTimers[0]
         }
         else {
-            Write-Host "`n  Multiple active timers. Specify an ID:" -ForegroundColor Yellow
+            # Show picker for multiple timers
+            $options = @()
             foreach ($t in $activeTimers) {
-                Write-Host "    [$($t.Id)] $($t.Message) - $(Format-Duration -Seconds $t.Seconds)" -ForegroundColor Gray
+                $remaining = ([DateTime]::Parse($t.EndTime) - (Get-Date))
+                $remainingStr = "{0:D2}:{1:D2}:{2:D2}" -f [int]$remaining.Hours, $remaining.Minutes, $remaining.Seconds
+                $options += @{
+                    Id    = $t.Id
+                    Label = "[$($t.Id)] $($t.Message) - $remainingStr remaining"
+                    Color = 'White'
+                }
             }
-            Write-Host ""
-            return
+            
+            $selectedId = Show-MenuPicker -Title "SELECT TIMER TO WATCH" -Options $options -AllowCancel
+            if (-not $selectedId) {
+                return
+            }
+            
+            $timer = $activeTimers | Where-Object { $_.Id -eq $selectedId }
         }
     }
     else {
@@ -830,8 +842,57 @@ function TimerRemove {
     }
 
     if ([string]::IsNullOrEmpty($Id)) {
-        Write-Host "`n  Specify timer ID, 'done' (finished only), or 'all'.`n" -ForegroundColor Yellow
-        return
+        # Sync first to get current states
+        $timers = @(Sync-TimerData)
+        
+        if ($timers.Count -eq 0) {
+            Write-Host "`n  No timers to remove.`n" -ForegroundColor Gray
+            return
+        }
+        
+        # Build options: individual timers + special actions
+        $options = @()
+        
+        # Add individual timers
+        foreach ($t in $timers) {
+            $stateColor = switch ($t.State) {
+                'Running'   { 'Green' }
+                'Completed' { 'DarkGray' }
+                'Stopped'   { 'Yellow' }
+                'Lost'      { 'Red' }
+                default     { 'Gray' }
+            }
+            $options += @{
+                Id    = $t.Id
+                Label = "[$($t.Id)] $($t.Message) ($($t.State))"
+                Color = $stateColor
+            }
+        }
+        
+        # Add special actions
+        $doneCount = @($timers | Where-Object { $_.State -eq 'Completed' -or $_.State -eq 'Lost' }).Count
+        if ($doneCount -gt 0) {
+            $options += @{
+                Id    = 'done'
+                Label = "Remove all finished ($doneCount completed/lost)"
+                Color = 'Cyan'
+            }
+        }
+        
+        $options += @{
+            Id    = 'all'
+            Label = "Remove ALL timers ($($timers.Count) total)"
+            Color = 'Red'
+        }
+        
+        $selectedId = Show-MenuPicker -Title "SELECT TIMER TO REMOVE" -Options $options -AllowCancel
+        if (-not $selectedId) {
+            return
+        }
+        
+        $Id = $selectedId
+        # Re-fetch timers in case state changed
+        $timers = @(Get-TimerData)
     }
 
     if ($Id -eq 'all') {

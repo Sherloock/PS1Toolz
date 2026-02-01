@@ -213,6 +213,90 @@ function Sync-TimerData {
     return $timers
 }
 
+function Show-MenuPicker {
+    <#
+    .SYNOPSIS
+        Shows an interactive menu picker and returns the selected option.
+    .PARAMETER Title
+        Title to display above the menu.
+    .PARAMETER Options
+        Array of options. Each option should have 'Id', 'Label', and optionally 'Color'.
+    .PARAMETER AllowCancel
+        If true, shows a cancel option (returns $null).
+    .RETURNS
+        The selected option's Id, or $null if cancelled.
+    .EXAMPLE
+        $options = @(
+            @{ Id = '1'; Label = 'First option' },
+            @{ Id = '2'; Label = 'Second option'; Color = 'Yellow' }
+        )
+        $selected = Show-MenuPicker -Title 'Pick one' -Options $options
+    #>
+    param(
+        [string]$Title,
+        [array]$Options,
+        [switch]$AllowCancel
+    )
+
+    if ($Options.Count -eq 0) {
+        return $null
+    }
+
+    Write-Host ""
+    if ($Title) {
+        Write-Host "  $Title" -ForegroundColor Cyan
+        Write-Host "  $('-' * $Title.Length)" -ForegroundColor DarkCyan
+    }
+    Write-Host ""
+
+    # Display options with numbers
+    for ($i = 0; $i -lt $Options.Count; $i++) {
+        $opt = $Options[$i]
+        $num = $i + 1
+        $color = if ($opt.Color) { $opt.Color } else { 'White' }
+        
+        Write-Host "  [" -NoNewline -ForegroundColor DarkGray
+        Write-Host "$num" -NoNewline -ForegroundColor Yellow
+        Write-Host "] " -NoNewline -ForegroundColor DarkGray
+        Write-Host $opt.Label -ForegroundColor $color
+    }
+
+    if ($AllowCancel) {
+        Write-Host ""
+        Write-Host "  [" -NoNewline -ForegroundColor DarkGray
+        Write-Host "0" -NoNewline -ForegroundColor Red
+        Write-Host "] " -NoNewline -ForegroundColor DarkGray
+        Write-Host "Cancel" -ForegroundColor DarkGray
+    }
+
+    Write-Host ""
+    Write-Host "  Select (1-$($Options.Count)): " -NoNewline -ForegroundColor Gray
+
+    $input = Read-Host
+    $input = $input.Trim()
+
+    # Handle cancel
+    if ($AllowCancel -and ($input -eq '0' -or $input -eq '')) {
+        Write-Host ""
+        return $null
+    }
+
+    # Validate input
+    $num = 0
+    if (-not [int]::TryParse($input, [ref]$num)) {
+        Write-Host "  Invalid selection.`n" -ForegroundColor Red
+        return $null
+    }
+
+    if ($num -lt 1 -or $num -gt $Options.Count) {
+        Write-Host "  Invalid selection.`n" -ForegroundColor Red
+        return $null
+    }
+
+    Write-Host ""
+    return $Options[$num - 1].Id
+}
+
 function Start-TimerJob {
     <#
     .SYNOPSIS

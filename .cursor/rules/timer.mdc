@@ -32,7 +32,7 @@ Accepts: `1h30m`, `25m`, `90s`, `1h20m30s`
 - Timer jobs run as PowerShell background jobs (`Start-Job`)
 - Timer state persists in `$env:TEMP\ps-timers.json`
 - Jobs have naming convention: `Timer_<id>`
-- Helper functions (in `Helpers.ps1`): `ConvertTo-Seconds`, `Format-Duration`, `New-TimerId`, `Get-TimerData`, `Save-TimerData`, `Sync-TimerData`, `Start-TimerJob`
+- Helper functions (in `Helpers.ps1`): `ConvertTo-Seconds`, `Format-Duration`, `New-TimerId`, `Get-TimerData`, `Save-TimerData`, `Sync-TimerData`, `Start-TimerJob`, `Show-MenuPicker`
 
 ## Timer States
 
