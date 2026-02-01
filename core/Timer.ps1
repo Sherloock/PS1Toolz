@@ -42,11 +42,7 @@ function Show-TimerHelp {
     Write-Host "  " -NoNewline
     Write-Host "td" -ForegroundColor Yellow -NoNewline
     Write-Host " [id|done|all]" -ForegroundColor Gray
-    Write-Host "      Remove timer(s) from list" -ForegroundColor DarkGray
-    Write-Host ""
-    Write-Host "  " -NoNewline
-    Write-Host "tc" -ForegroundColor Yellow
-    Write-Host "      Clear all Lost and Completed timers" -ForegroundColor DarkGray
+    Write-Host "      Remove timer(s): id, done (completed/lost), all" -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  Time formats: " -ForegroundColor DarkGray -NoNewline
     Write-Host "1h30m, 25m, 90s, 1h20m30s" -ForegroundColor White
@@ -320,8 +316,6 @@ function Show-TimerListOnce {
         Write-Host "tr <id>" -ForegroundColor White -NoNewline
         Write-Host " | Delete " -ForegroundColor DarkGray -NoNewline
         Write-Host "td <id>" -ForegroundColor White -NoNewline
-        Write-Host " | Clear " -ForegroundColor DarkGray -NoNewline
-        Write-Host "tc" -ForegroundColor White -NoNewline
         Write-Host " | Watch " -ForegroundColor DarkGray -NoNewline
         Write-Host "tl -w" -ForegroundColor White
         Write-Host ""
@@ -893,40 +887,3 @@ function TimerRemove {
     }
 }
 
-function TimerClear {
-    <#
-    .SYNOPSIS
-        Clears all Lost and Completed timers from the list.
-    .EXAMPLE
-        TimerClear
-        tc
-    #>
-    $timers = @(Get-TimerData)
-
-    if ($timers.Count -eq 0) {
-        Write-Host "`n  No timers to clear.`n" -ForegroundColor Gray
-        return
-    }
-
-    $toKeep = @()
-    $cleared = 0
-
-    foreach ($t in $timers) {
-        if ($t.State -eq 'Lost' -or $t.State -eq 'Completed') {
-            $jobName = "Timer_$($t.Id)"
-            Remove-Job -Name $jobName -Force -ErrorAction SilentlyContinue
-            $cleared++
-        }
-        else {
-            $toKeep += $t
-        }
-    }
-
-    if ($cleared -eq 0) {
-        Write-Host "`n  No Lost or Completed timers to clear.`n" -ForegroundColor Gray
-        return
-    }
-
-    Save-TimerData -Timers $toKeep
-    Write-Host "`n  Cleared $cleared timer(s).`n" -ForegroundColor Yellow
-}

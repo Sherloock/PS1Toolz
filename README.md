@@ -57,8 +57,7 @@ The `config.ps1` file is gitignored and won't be committed.
 - `tw [id]` - Watch single timer with live countdown and progress bar
 - `ts [id|all]` - Stop/pause timer(s)
 - `tr [id|all]` - Resume timer(s)
-- `td [id|done|all]` - Remove timer(s)
-- `tc` - Clear all completed/lost timers
+- `td [id|done|all]` - Remove timer(s): specific id, completed/lost only, or all
 
 ### Dev
 

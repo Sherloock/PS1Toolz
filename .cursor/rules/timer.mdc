@@ -21,8 +21,7 @@ The timer module provides background timers with notifications. It's excluded fr
 | `TimerWatch` | `tw` | Watch single timer with progress bar |
 | `TimerStop` | `ts` | Pause timer(s) |
 | `TimerResume` | `tr` | Resume stopped timer(s) |
-| `TimerRemove` | `td` | Remove timer(s) from list |
-| `TimerClear` | `tc` | Clear Lost and Completed timers |
+| `TimerRemove` | `td` | Remove timer(s): id, done (completed/lost), all |
 
 ## Time Format
 
