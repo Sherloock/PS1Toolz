@@ -13,9 +13,19 @@ if (Test-Path -LiteralPath $helpersPath) {
     . $helpersPath
 }
 
-# Load remaining .ps1 files (exclude loader, Helpers, and config files)
+# Load TimerHelpers.ps1 second (required by Timer.ps1)
+$timerHelpersPath = Join-Path $ToolKitDir "core\TimerHelpers.ps1"
+if (Test-Path -LiteralPath $timerHelpersPath) {
+    . $timerHelpersPath
+}
+
+# Load remaining .ps1 files (exclude loader, helpers, config, and tests)
 Get-ChildItem -Path $ToolKitDir -Filter "*.ps1" -Recurse | Where-Object {
-    $_.Name -ne "loader.ps1" -and $_.Name -ne "Helpers.ps1" -and $_.Name -notlike "config*.ps1"
+    $_.Name -ne "loader.ps1" -and
+    $_.Name -ne "Helpers.ps1" -and
+    $_.Name -ne "TimerHelpers.ps1" -and
+    $_.Name -notlike "config*.ps1" -and
+    $_.FullName -notlike "*\tests\*"
 } | ForEach-Object {
     . $_.FullName
 }
@@ -27,5 +37,15 @@ function global:Reload {
     . "$ToolKitDir\loader.ps1"
 }
 
-# Show dashboard on load
-??
+# Run Pester tests
+function global:Test {
+    param(
+        [switch]$Detailed,
+        [switch]$Coverage
+    )
+    $params = @{}
+    if ($Detailed) { $params['Detailed'] = $true }
+    if ($Coverage) { $params['Coverage'] = $true }
+    & "$ToolKitDir\tests\Run-Tests.ps1" @params
+}
+

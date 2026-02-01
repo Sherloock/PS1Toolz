@@ -29,13 +29,17 @@ function ShowIP {
 
     $PublicData = $null
     try {
-        $PublicData = Invoke-RestMethod -Uri "http://ip-api.com/json/" -TimeoutSec 5 -ErrorAction SilentlyContinue
+        $PublicData = Invoke-RestMethod -Uri "http://ip-api.com/json/" -TimeoutSec 5 -ErrorAction Stop
     } catch {
-        $PublicData = Invoke-RestMethod -Uri "https://ipinfo.io/json" -TimeoutSec 5 -ErrorAction SilentlyContinue
-        if ($PublicData.loc) {
-            $PublicData | Add-Member -NotePropertyName "city" -NotePropertyValue $PublicData.city -Force
-            $PublicData | Add-Member -NotePropertyName "isp" -NotePropertyValue $PublicData.org -Force
-            $PublicData | Add-Member -NotePropertyName "query" -NotePropertyValue $PublicData.ip -Force
+        try {
+            $PublicData = Invoke-RestMethod -Uri "https://ipinfo.io/json" -TimeoutSec 5 -ErrorAction Stop
+            if ($PublicData.loc) {
+                $PublicData | Add-Member -NotePropertyName "city" -NotePropertyValue $PublicData.city -Force
+                $PublicData | Add-Member -NotePropertyName "isp" -NotePropertyValue $PublicData.org -Force
+                $PublicData | Add-Member -NotePropertyName "query" -NotePropertyValue $PublicData.ip -Force
+            }
+        } catch {
+            $PublicData = $null
         }
     }
 

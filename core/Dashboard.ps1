@@ -15,6 +15,7 @@ function ?? {
     # Exclude entire files (relative to toolkit dir, use just filename or path like "core\Helpers.ps1")
     $ExcludedFiles = @(
         "Helpers.ps1",
+        "TimerHelpers.ps1",
         "Timer.ps1"
     )
 

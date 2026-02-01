@@ -1,0 +1,155 @@
+---
+description: Testing standards and requirements for all code changes
+globs: "**/*.ps1,tests/**"
+---
+
+# Testing Standards
+
+## Mandatory Requirements
+
+### 1. Run Tests After ANY Code Change
+
+- Execute `Invoke-Pester .\tests\` before committing
+- All tests must pass before changes are committed
+- Fix failing tests immediately - do not leave broken tests
+
+### 2. New Features Require Tests
+
+- Every new function needs corresponding test cases
+- Cover at minimum:
+  - Happy path (normal expected usage)
+  - Edge cases (boundary values, empty inputs)
+  - Error handling (invalid inputs, failures)
+- Add tests to the appropriate `*.Tests.ps1` file based on module
+
+### 3. Modify Tests When Changing Existing Functions
+
+- Update tests to reflect new behavior
+- Add tests for new parameters/features
+- Remove tests for deprecated functionality
+- If a test fails after your change, either:
+  - Fix the code if it's a bug
+  - Update the test if behavior intentionally changed
+
+## Test File Organization
+
+Tests live in `tests/` folder with this structure:
+
+| Test File | Covers |
+|-----------|--------|
+| `Core.Tests.ps1` | `Helpers.ps1`, `TimerHelpers.ps1` (pure functions) |
+| `Timer.Tests.ps1` | `Timer.ps1` (with mocked scheduled tasks) |
+| `System.Tests.ps1` | `System.ps1` (ShowIP, DiskSpace) |
+| `DevTools.Tests.ps1` | `DevTools.ps1` (PortKill, NodeKill) |
+| `Navigation.Tests.ps1` | `Navigation.ps1` (Go function) |
+| `Pass.Tests.ps1` | `Pass.ps1` (password generation) |
+| `Media.Tests.ps1` | `Library.ps1` (Size, Movies) |
+
+## Number Formatting Standards
+
+- **Always use period (`.`) as decimal separator** - never comma (e.g., `"2.00 GB"` not `"2,00 GB"`)
+- Use `[System.Globalization.CultureInfo]::InvariantCulture` for locale-independent formatting:
+
+```powershell
+$inv = [System.Globalization.CultureInfo]::InvariantCulture
+$value.ToString("F2", $inv)  # Outputs "2.00" regardless of system locale
+```
+
+## Test Structure (Pester)
+
+```powershell
+Describe "FunctionName" {
+    BeforeAll {
+        # Setup mocks, load modules
+    }
+
+    It "does X when Y" {
+        # Arrange
+        $input = "test"
+        
+        # Act
+        $result = FunctionName -Param $input
+        
+        # Assert
+        $result | Should -Be "expected"
+    }
+
+    It "handles edge case Z" {
+        # Test boundary conditions
+    }
+
+    It "throws on invalid input" {
+        { FunctionName -Param $null } | Should -Throw
+    }
+}
+```
+
+## Mocking Guidelines
+
+### External Dependencies
+
+Always mock these to ensure tests are isolated and fast:
+
+```powershell
+# Scheduled Tasks
+Mock Register-ScheduledTask { }
+Mock Get-ScheduledTask { $null }
+Mock Unregister-ScheduledTask { }
+
+# Network calls
+Mock Invoke-RestMethod { @{ data = "mocked" } }
+Mock Get-NetIPConfiguration { ... }
+
+# WMI/CIM
+Mock Get-WmiObject { ... }
+
+# Filesystem (for isolation)
+Mock Get-ChildItem { ... }
+Mock Remove-Item { }
+
+# Clipboard
+Mock clip { }
+```
+
+### File I/O Isolation
+
+Use `$TestDrive` for file operations:
+
+```powershell
+BeforeAll {
+    $script:TimerDataFile = "$TestDrive\ps-timers.json"
+}
+```
+
+### Time-Dependent Tests
+
+Mock `Get-Date` for deterministic results:
+
+```powershell
+Mock Get-Date { [DateTime]::new(2024, 1, 1, 12, 0, 0) }
+```
+
+## Running Tests
+
+**Requires Pester 5.x** (auto-installed by `Run-Tests.ps1`)
+
+```powershell
+# Run all tests (auto-installs Pester 5 if needed)
+.\Run-Tests.ps1
+
+# Detailed output
+.\Run-Tests.ps1 -Detailed
+
+# With code coverage
+.\Run-Tests.ps1 -Coverage
+
+# Specific file only
+Invoke-Pester .\tests\Timer.Tests.ps1 -Output Detailed
+```
+
+## When Adding New Modules
+
+1. Create `tests/<ModuleName>.Tests.ps1`
+2. Add `BeforeAll` block to load the module
+3. Write tests for all public functions
+4. Run full test suite to ensure no regressions

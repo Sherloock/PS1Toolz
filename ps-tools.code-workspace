@@ -5,6 +5,7 @@
         }
     ],
     "settings": {
+        "terminal.integrated.persistentSessionReviveProcess": "never",
         "terminal.integrated.defaultProfile.windows": "PowerShell",
         "files.associations": {
             "*.ps1": "powershell"
@@ -12,6 +13,11 @@
         "powershell.codeFormatting.preset": "OTBS",
         "powershell.codeFormatting.autoCorrectAliases": true,
         "powershell.scriptAnalysis.enable": true,
+        "powershell.pester.useLegacyCodeLens": false,
+        "powershell.pester.codeLens": false,
+        "powershell.pester.outputVerbosity": "None",
+        "testing.autoRun.enable": false,
+        "testing.openTesting": "neverOpen",
         "editor.formatOnSave": true,
         "editor.tabSize": 4,
         "editor.insertSpaces": true,

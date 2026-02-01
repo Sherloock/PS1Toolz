@@ -1,6 +1,6 @@
 ---
 description: Timer module commands and documentation
-globs: "core/Timer.ps1,core/Helpers.ps1"
+globs: "core/Timer.ps1,core/TimerHelpers.ps1,core/Helpers.ps1"
 ---
 
 # Timer Module
@@ -19,8 +19,8 @@ The timer module provides background timers with notifications. It's excluded fr
 | `Timer` | `t` | Start a background timer |
 | `TimerList` | `tl` | List active timers (-a all, -w live watch) |
 | `TimerWatch` | `tw` | Watch single timer with progress bar |
-| `TimerStop` | `ts` | Pause timer(s) |
-| `TimerResume` | `tr` | Resume stopped timer(s) |
+| `TimerPause` | `tp` | Pause timer(s) |
+| `TimerResume` | `tr` | Resume paused/lost timer(s) |
 | `TimerRemove` | `td` | Remove timer(s): id, done (completed/lost), all |
 
 ## Time Format
@@ -29,21 +29,35 @@ Accepts: `1h30m`, `25m`, `90s`, `1h20m30s`
 
 ## Implementation Notes
 
-- Timer jobs run as PowerShell background jobs (`Start-Job`)
+- Timers use **Windows Scheduled Tasks** (survive terminal closure)
 - Timer state persists in `$env:TEMP\ps-timers.json`
-- Jobs have naming convention: `Timer_<id>`
-- Helper functions (in `Helpers.ps1`): `ConvertTo-Seconds`, `Format-Duration`, `New-TimerId`, `Get-TimerData`, `Save-TimerData`, `Sync-TimerData`, `Start-TimerJob`, `Show-MenuPicker`
+- Tasks named: `PSTimer_<id>`, scripts at `$env:TEMP\PSTimer_<id>.ps1`
+- Notification script runs independently, updates JSON, handles repeats
+
+### Helper Files
+
+- **`Helpers.ps1`** (general): `ConvertTo-Seconds`, `Format-Duration`, `New-TimerId`, `Get-TimerData`, `Save-TimerData`, `Sync-TimerData`, `Start-TimerJob`, `Stop-TimerTask`, `Show-MenuPicker`
+- **`TimerHelpers.ps1`** (timer-specific): `Get-AnsiColors`, `Format-RemainingTime`, `Get-TimerStateColor`, `Get-TimerProgress`, `Get-TruncatedMessage`, `Get-TimerPickerOptions`
 
 ## Timer States
 
-- `Running` - Active timer with job
-- `Stopped` - Paused, can resume
+- `Running` - Active timer with scheduled task
+- `Paused` - Temporarily paused, can resume with remaining time
 - `Completed` - Finished successfully
-- `Lost` - Job not found after end time (e.g., terminal closed)
+- `Lost` - Task not found after end time (can be restarted with `tr`)
+
+## Interactive Display (Anti-Flicker)
+
+When printing interactive/updating displays (menus, watch modes, progress):
+- Build entire output in a `StringBuilder` before printing
+- Use `[Console]::Write($sb.ToString())` for atomic output
+- Clear screen AFTER building output, immediately before writing
+- Use ANSI escape codes (from `Get-AnsiColors`) instead of multiple `Write-Host` calls
 
 ## When Adding Timer Features
 
 1. User-facing functions go in `Timer.ps1`
-2. Internal helpers go in `Helpers.ps1`
-3. Update the `Show-TimerHelp` function if adding new commands
-4. Add alias in the aliases section of `Timer.ps1`
+2. Timer-specific helpers go in `TimerHelpers.ps1`
+3. General helpers go in `Helpers.ps1`
+4. Update the `Show-TimerHelp` function if adding new commands
+5. Add alias in the aliases section of `Timer.ps1`

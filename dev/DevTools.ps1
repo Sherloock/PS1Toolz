@@ -7,7 +7,11 @@ function PortKill {
     .PARAMETER Port
         The port number (e.g. 3000).
     #>
-    param ([Parameter(Mandatory=$true)][int]$Port)
+    param ([int]$Port)
+
+    if (-not $PSBoundParameters.ContainsKey('Port')) {
+        throw "Port parameter is required."
+    }
 
     $ProcId = (Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue).OwningProcess | Select-Object -First 1
     if ($ProcId) {
@@ -44,7 +48,19 @@ function NodeKill {
     foreach ($f in $folders) {
         # Calculate total size of this project's node_modules
         $sizeBytes = (Get-ChildItem -LiteralPath $f.FullName -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
-        $sizeMB = [math]::Round($sizeBytes / 1MB, 2)
+        if ($sizeBytes -is [System.Array]) {
+            $sumBytes = 0.0
+            foreach ($value in $sizeBytes) {
+                if ($null -ne $value) {
+                    $sumBytes += [double]$value
+                }
+            }
+            $sizeBytes = $sumBytes
+        }
+        if ($null -eq $sizeBytes) {
+            $sizeBytes = 0
+        }
+        $sizeMB = [math]::Round([double]$sizeBytes / 1MB, 2)
 
         $list += [PSCustomObject]@{ Size = $sizeMB; Path = $f.FullName }
     }
@@ -64,7 +80,13 @@ function NodeKill {
     }
     Write-Host ("-" * 70)
 
-    $totalScanGB = [math]::Round(($list | Measure-Object -Property Size -Sum).Sum / 1024, 2)
+    $totalSizeMB = 0.0
+    foreach ($item in $list) {
+        if ($null -ne $item.Size) {
+            $totalSizeMB += [double]$item.Size
+        }
+    }
+    $totalScanGB = [math]::Round($totalSizeMB / 1024, 2)
     Write-Host "TOTAL RECLAIMABLE SPACE: $totalScanGB GB" -ForegroundColor Green
 
     Write-Host "`nOptions: ID numbers (1,3), 'all', or Enter to cancel."

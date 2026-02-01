@@ -12,9 +12,10 @@ function Get-ReadableSize {
     #>
     param([long]$Bytes)
 
-    if ($Bytes -ge 1GB) { return "{0:N2} GB" -f ($Bytes / 1GB) }
-    if ($Bytes -ge 1MB) { return "{0:N2} MB" -f ($Bytes / 1MB) }
-    if ($Bytes -ge 1KB) { return "{0:N2} KB" -f ($Bytes / 1KB) }
+    $inv = [System.Globalization.CultureInfo]::InvariantCulture
+    if ($Bytes -ge 1GB) { return ($Bytes / 1GB).ToString("F2", $inv) + " GB" }
+    if ($Bytes -ge 1MB) { return ($Bytes / 1MB).ToString("F2", $inv) + " MB" }
+    if ($Bytes -ge 1KB) { return ($Bytes / 1KB).ToString("F2", $inv) + " KB" }
     return "$Bytes B"
 }
 
@@ -24,6 +25,9 @@ function Get-ReadableSize {
 
 # Timer data file path (shared across timer functions)
 $script:TimerDataFile = Join-Path $env:TEMP "ps-timers.json"
+# Cache for watch mode optimization
+$script:TimerDataCache = $null
+$script:TimerDataCacheTime = [DateTime]::MinValue
 
 function ConvertTo-Seconds {
     <#
@@ -90,6 +94,45 @@ function Get-TimerData {
     return @()
 }
 
+function Get-TimerDataIfChanged {
+    <#
+    .SYNOPSIS
+        Returns timer data only if the JSON file was modified since last read.
+    .DESCRIPTION
+        Optimized for watch mode - avoids unnecessary file reads by checking
+        the file's LastWriteTime against a cached timestamp.
+    .PARAMETER Force
+        If set, always reads the file regardless of modification time.
+    .RETURNS
+        Hashtable with Keys: Data (array), Changed (bool)
+    #>
+    param([switch]$Force)
+
+    if (-not (Test-Path -LiteralPath $script:TimerDataFile)) {
+        $script:TimerDataCache = @()
+        $script:TimerDataCacheTime = [DateTime]::MinValue
+        return @{ Data = @(); Changed = $true }
+    }
+
+    $fileInfo = Get-Item -LiteralPath $script:TimerDataFile -ErrorAction SilentlyContinue
+    if (-not $fileInfo) {
+        return @{ Data = @(); Changed = $false }
+    }
+
+    $lastWrite = $fileInfo.LastWriteTime
+
+    # Check if file was modified since last cache
+    if (-not $Force -and $script:TimerDataCache -ne $null -and $lastWrite -le $script:TimerDataCacheTime) {
+        return @{ Data = $script:TimerDataCache; Changed = $false }
+    }
+
+    # File changed or no cache - read fresh data
+    $script:TimerDataCache = @(Get-TimerData)
+    $script:TimerDataCacheTime = $lastWrite
+
+    return @{ Data = $script:TimerDataCache; Changed = $true }
+}
+
 function Save-TimerData {
     <#
     .SYNOPSIS
@@ -149,59 +192,55 @@ function Format-Duration {
 function Sync-TimerData {
     <#
     .SYNOPSIS
-        Syncs timer data with actual job states, cleans up finished jobs.
+        Syncs timer data with actual scheduled task states.
+    .DESCRIPTION
+        Checks if scheduled tasks exist for running timers.
+        Only marks as Lost if task is missing AND end time has passed.
     #>
     $timers = @(Get-TimerData)
     $changed = $false
 
     foreach ($timer in $timers) {
-        $jobName = "Timer_$($timer.Id)"
-        $job = Get-Job -Name $jobName -ErrorAction SilentlyContinue
+        if ($timer.State -ne 'Running') { continue }
+        
+        $taskName = "PSTimer_$($timer.Id)"
+        $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 
-        if ($job) {
-            if ($job.State -eq 'Completed') {
-                if ($timer.RepeatRemaining -gt 0) {
-                    $timer.RepeatRemaining = $timer.RepeatRemaining - 1
-                    $timer.CurrentRun = $timer.RepeatTotal - $timer.RepeatRemaining
-                    $timer.StartTime = (Get-Date).ToString('o')
-                    $timer.EndTime = (Get-Date).AddSeconds($timer.Seconds).ToString('o')
-                    $timer.State = 'Running'
-
-                    Remove-Job -Name $jobName -Force -ErrorAction SilentlyContinue
-                    Start-TimerJob -Timer $timer
-                    $changed = $true
-                }
-                else {
-                    $timer.State = 'Completed'
-                    Remove-Job -Name $jobName -Force -ErrorAction SilentlyContinue
-                    $changed = $true
+        if ($task) {
+            # Task exists - timer is still active, check if it ran
+            $taskInfo = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue
+            if ($taskInfo -and $taskInfo.LastRunTime -and $taskInfo.LastRunTime -gt [DateTime]::MinValue) {
+                # Task has run - the script should have updated the JSON
+                # Re-read to get any changes made by the scheduled task
+                $freshTimers = @(Get-TimerData)
+                $freshTimer = $freshTimers | Where-Object { $_.Id -eq $timer.Id }
+                if ($freshTimer -and $freshTimer.State -ne $timer.State) {
+                    return $freshTimers  # Return updated data
                 }
             }
-            elseif ($job.State -eq 'Running') {
-                $timer.State = 'Running'
-            }
-            elseif ($job.State -eq 'Stopped') {
-                $timer.State = 'Stopped'
-            }
+            # Task exists and hasn't run yet - timer is valid
         }
         else {
-            # Job not found - could be a different terminal/process
-            # Only mark as lost if the timer should have already ended
-            if ($timer.State -eq 'Running') {
-                try {
-                    $endTime = [DateTime]::Parse($timer.EndTime)
-                    if ((Get-Date) -gt $endTime) {
-                        # Timer expired without job - mark as lost
-                        $timer.State = 'Lost'
-                        $changed = $true
-                    }
-                    # Otherwise, timer is still valid but job is in another process - leave as Running
-                }
-                catch {
-                    # Invalid EndTime format - mark as lost
+            # Task not found - check if timer should have ended
+            try {
+                $endTime = [DateTime]::Parse($timer.EndTime)
+                $remaining = [int]($endTime - (Get-Date)).TotalSeconds
+                
+                if ($remaining -le 0) {
+                    # Timer expired without task - mark as lost
                     $timer.State = 'Lost'
+                    # Save 0 remaining (cycle expired)
+                    $timer | Add-Member -NotePropertyName 'RemainingSeconds' -NotePropertyValue 0 -Force
                     $changed = $true
                 }
+                # Otherwise, task might still be scheduling - give it a moment
+                # If still no task after end time, mark as lost with remaining time
+            }
+            catch {
+                # Invalid EndTime format - mark as lost
+                $timer.State = 'Lost'
+                $timer | Add-Member -NotePropertyName 'RemainingSeconds' -NotePropertyValue $timer.Seconds -Force
+                $changed = $true
             }
         }
     }
@@ -216,13 +255,13 @@ function Sync-TimerData {
 function Show-MenuPicker {
     <#
     .SYNOPSIS
-        Shows an interactive menu picker and returns the selected option.
+        Shows an interactive menu picker with arrow key navigation.
     .PARAMETER Title
         Title to display above the menu.
     .PARAMETER Options
         Array of options. Each option should have 'Id', 'Label', and optionally 'Color'.
     .PARAMETER AllowCancel
-        If true, shows a cancel option (returns $null).
+        If true, Escape key cancels (returns $null).
     .RETURNS
         The selected option's Id, or $null if cancelled.
     .EXAMPLE
@@ -242,100 +281,200 @@ function Show-MenuPicker {
         return $null
     }
 
-    Write-Host ""
-    if ($Title) {
-        Write-Host "  $Title" -ForegroundColor Cyan
-        Write-Host "  $('-' * $Title.Length)" -ForegroundColor DarkCyan
+    $selectedIndex = 0
+    $optionCount = $Options.Count
+    
+    # Selection indicator
+    $selector = [char]0x25B6  # ▶
+    
+    # ANSI color codes for flicker-free rendering
+    $c = Get-AnsiColors
+    
+    # Map color names to ANSI codes
+    $colorMap = @{
+        'White'      = $c.White
+        'Yellow'     = $c.Yellow
+        'Green'      = $c.Green
+        'Red'        = $c.Red
+        'Cyan'       = $c.Cyan
+        'Magenta'    = $c.Magenta
+        'Gray'       = $c.Gray
+        'DarkGray'   = $c.Dim
+        'DarkYellow' = $c.Yellow
     }
-    Write-Host ""
-
-    # Display options with numbers
-    for ($i = 0; $i -lt $Options.Count; $i++) {
-        $opt = $Options[$i]
-        $num = $i + 1
-        $color = if ($opt.Color) { $opt.Color } else { 'White' }
-        
-        Write-Host "  [" -NoNewline -ForegroundColor DarkGray
-        Write-Host "$num" -NoNewline -ForegroundColor Yellow
-        Write-Host "] " -NoNewline -ForegroundColor DarkGray
-        Write-Host $opt.Label -ForegroundColor $color
+    
+    [Console]::CursorVisible = $false
+    
+    try {
+        while ($true) {
+            # Build entire output in StringBuilder to avoid flicker
+            $sb = [System.Text.StringBuilder]::new()
+            
+            [void]$sb.AppendLine("")
+            if ($Title) {
+                [void]$sb.AppendLine("$($c.Cyan)  $Title$($c.Reset)")
+                [void]$sb.AppendLine("$($c.DarkCyan)  $('-' * $Title.Length)$($c.Reset)")
+            }
+            [void]$sb.AppendLine("")
+            
+            # Draw options
+            for ($i = 0; $i -lt $optionCount; $i++) {
+                $opt = $Options[$i]
+                $isSelected = ($i -eq $selectedIndex)
+                $baseColorCode = if ($opt.Color -and $colorMap[$opt.Color]) { $colorMap[$opt.Color] } else { $c.White }
+                
+                if ($isSelected) {
+                    # Selected: cyan selector with inverted colors (cyan bg, black text)
+                    [void]$sb.AppendLine("$($c.Cyan)  $selector $($c.Reset)$($c.InvertCyan)$($opt.Label)$($c.Reset)")
+                }
+                else {
+                    [void]$sb.AppendLine("    ${baseColorCode}$($opt.Label)$($c.Reset)")
+                }
+            }
+            
+            [void]$sb.AppendLine("")
+            $cancelText = if ($AllowCancel) { ", Esc=cancel" } else { "" }
+            [void]$sb.AppendLine("$($c.Yellow)  [Up/Down]$($c.Dim) navigate  $($c.Green)[Enter]$($c.Dim) select$cancelText$($c.Reset)")
+            
+            # Clear and write atomically
+            Clear-Host
+            [Console]::Write($sb.ToString())
+            
+            # Wait for keypress
+            $key = [Console]::ReadKey($true)
+            
+            switch ($key.Key) {
+                'UpArrow' {
+                    if ($selectedIndex -gt 0) {
+                        $selectedIndex--
+                    }
+                    else {
+                        $selectedIndex = $optionCount - 1  # Wrap to bottom
+                    }
+                }
+                'DownArrow' {
+                    if ($selectedIndex -lt $optionCount - 1) {
+                        $selectedIndex++
+                    }
+                    else {
+                        $selectedIndex = 0  # Wrap to top
+                    }
+                }
+                'Enter' {
+                    Clear-Host
+                    return $Options[$selectedIndex].Id
+                }
+                'Escape' {
+                    if ($AllowCancel) {
+                        Clear-Host
+                        return $null
+                    }
+                }
+            }
+        }
     }
-
-    if ($AllowCancel) {
-        Write-Host ""
-        Write-Host "  [" -NoNewline -ForegroundColor DarkGray
-        Write-Host "0" -NoNewline -ForegroundColor Red
-        Write-Host "] " -NoNewline -ForegroundColor DarkGray
-        Write-Host "Cancel" -ForegroundColor DarkGray
+    finally {
+        [Console]::CursorVisible = $true
     }
-
-    Write-Host ""
-    Write-Host "  Select (1-$($Options.Count)): " -NoNewline -ForegroundColor Gray
-
-    $input = Read-Host
-    $input = $input.Trim()
-
-    # Handle cancel
-    if ($AllowCancel -and ($input -eq '0' -or $input -eq '')) {
-        Write-Host ""
-        return $null
-    }
-
-    # Validate input
-    $num = 0
-    if (-not [int]::TryParse($input, [ref]$num)) {
-        Write-Host "  Invalid selection.`n" -ForegroundColor Red
-        return $null
-    }
-
-    if ($num -lt 1 -or $num -gt $Options.Count) {
-        Write-Host "  Invalid selection.`n" -ForegroundColor Red
-        return $null
-    }
-
-    Write-Host ""
-    return $Options[$num - 1].Id
 }
 
 function Start-TimerJob {
     <#
     .SYNOPSIS
-        Internal function to start a timer job.
+        Internal function to start a timer using Windows Scheduled Task.
+    .DESCRIPTION
+        Uses Scheduled Tasks instead of PowerShell jobs so timers survive terminal closure.
     #>
     param([PSCustomObject]$Timer)
 
-    $jobName = "Timer_$($Timer.Id)"
+    $taskName = "PSTimer_$($Timer.Id)"
+    $dataFile = Join-Path $env:TEMP "ps-timers.json"
+    
+    # Calculate trigger time
+    $triggerTime = (Get-Date).AddSeconds($Timer.Seconds)
+    
+    # Build the notification script that runs when timer fires
+    # This script is self-contained and runs independently of the terminal
+    $script = @"
+`$timerId = $($Timer.Id)
+`$message = '$($Timer.Message -replace "'", "''")'
+`$duration = '$($Timer.Duration)'
+`$repeatTotal = $($Timer.RepeatTotal)
+`$currentRun = $($Timer.CurrentRun)
+`$timerSeconds = $($Timer.Seconds)
+`$dataFile = '$dataFile'
 
-    Start-Job -Name $jobName -ScriptBlock {
-        param($seconds, $message, $timerId, $duration, $startTime, $repeatTotal, $currentRun)
+# Beep notification
+[console]::beep(440, 500)
 
-        Start-Sleep -Seconds $seconds
-        [console]::beep(440, 500)
-
-        # Format start time
-        $startDt = [DateTime]::Parse($startTime)
-        $startStr = $startDt.ToString('HH:mm:ss')
-        $endStr = (Get-Date).ToString('HH:mm:ss')
-
-        # Build detailed body
-        $body = @(
-            "Timer #$timerId completed!"
-            ""
-            "Duration: $duration"
-            "Started:  $startStr"
-            "Finished: $endStr"
-        )
-
-        if ($repeatTotal -gt 1) {
-            $body += "Run:      $currentRun of $repeatTotal"
+# Update timer data FIRST (before popup, so tl shows correct state)
+if (Test-Path -LiteralPath `$dataFile) {
+    `$jsonContent = Get-Content -LiteralPath `$dataFile -Raw -ErrorAction SilentlyContinue
+    `$parsed = `$jsonContent | ConvertFrom-Json
+    `$timers = New-Object System.Collections.ArrayList
+    `$parsed | ForEach-Object { [void]`$timers.Add(`$_) }
+    `$timer = `$timers | Where-Object { `$_.Id -eq `$timerId }
+    if (`$timer) {
+        if (`$timer.RepeatRemaining -gt 0) {
+            # More repeats to go - schedule next run
+            `$timer.RepeatRemaining = `$timer.RepeatRemaining - 1
+            `$timer.CurrentRun = `$timer.RepeatTotal - `$timer.RepeatRemaining
+            `$timer.StartTime = (Get-Date).ToString('o')
+            `$timer.EndTime = (Get-Date).AddSeconds(`$timerSeconds).ToString('o')
+            `$timer.State = 'Running'
+            
+            # Schedule next run
+            `$nextTrigger = (Get-Date).AddSeconds(`$timerSeconds)
+            `$nextAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"`$env:TEMP\PSTimer_`$timerId.ps1`""
+            `$nextTriggerObj = New-ScheduledTaskTrigger -Once -At `$nextTrigger
+            `$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+            Unregister-ScheduledTask -TaskName "PSTimer_`$timerId" -Confirm:`$false -ErrorAction SilentlyContinue
+            Register-ScheduledTask -TaskName "PSTimer_`$timerId" -Action `$nextAction -Trigger `$nextTriggerObj -Settings `$settings -Force | Out-Null
+        } else {
+            # All done
+            `$timer.State = 'Completed'
+            Unregister-ScheduledTask -TaskName "PSTimer_`$timerId" -Confirm:`$false -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath "`$env:TEMP\PSTimer_`$timerId.ps1" -Force -ErrorAction SilentlyContinue
         }
+        ConvertTo-Json -InputObject `$timers -Depth 10 | Set-Content -LiteralPath `$dataFile -Force
+    }
+}
 
-        $bodyText = $body -join "`n"
+# Show popup (after state update, so it can block without affecting tl display)
+`$startStr = '$((Get-Date).ToString('HH:mm:ss'))'
+`$endStr = (Get-Date).ToString('HH:mm:ss')
+`$body = @("Timer #`$timerId completed!", "", "Duration: `$duration", "Started:  `$startStr", "Finished: `$endStr")
+if (`$repeatTotal -gt 1) { `$body += "Run:      `$currentRun of `$repeatTotal" }
+`$popup = New-Object -ComObject WScript.Shell
+`$popup.Popup((`$body -join [char]10), 0, `$message, 64) | Out-Null
+"@
+    
+    # Write script to temp file (scheduled tasks work better with script files)
+    $scriptPath = Join-Path $env:TEMP "PSTimer_$($Timer.Id).ps1"
+    $script | Set-Content -LiteralPath $scriptPath -Force -Encoding UTF8
+    
+    # Remove any existing task with same name
+    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+    
+    # Create scheduled task
+    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$scriptPath`""
+    $trigger = New-ScheduledTaskTrigger -Once -At $triggerTime
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+    
+    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
+}
 
-        # Title shows message first
-        $title = "$message"
-
-        $popup = New-Object -ComObject WScript.Shell
-        $popup.Popup($bodyText, 0, $title, 64) | Out-Null
-    } -ArgumentList $Timer.Seconds, $Timer.Message, $Timer.Id, $Timer.Duration, $Timer.StartTime, $Timer.RepeatTotal, $Timer.CurrentRun | Out-Null
+function Stop-TimerTask {
+    <#
+    .SYNOPSIS
+        Stops and unregisters a timer's scheduled task.
+    #>
+    param([int]$TimerId)
+    
+    $taskName = "PSTimer_$TimerId"
+    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+    
+    # Also clean up the script file
+    $scriptPath = Join-Path $env:TEMP "PSTimer_$TimerId.ps1"
+    Remove-Item -LiteralPath $scriptPath -Force -ErrorAction SilentlyContinue
 }
