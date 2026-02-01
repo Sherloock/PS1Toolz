@@ -6,12 +6,14 @@ alwaysApply: true
 
 # PowerShell Toolkit Standards
 
+## Rule Usage
+
+When applying any rule from `.cursor/rules/`, always reference which rule you're following (e.g., "Per `timer.mdc`: ...").
+
 ## Code Standards
 
-- Every function must include a `<# .SYNOPSIS #>` block for the `??` dashboard
-- Use `Write-Host` with colors for dashboard-style output
-- Handle long Windows paths using `-LiteralPath`
 - PowerShell 5.1 compatible (no ternary operators `? :`)
+- Handle long Windows paths using `-LiteralPath`
 - Format sizes in GB/MB using SI units
 
 ## User Feedback (MANDATORY)
@@ -33,10 +35,3 @@ alwaysApply: true
 - `core/`: System utilities, timers, dashboard components
 - `dev/`: Development tools, port management, navigation
 - `media/`: File/video library management
-
-## Helper Functions
-
-- Internal/helper functions go in `core/Helpers.ps1`, NOT in feature files
-- `Helpers.ps1` is loaded first by `loader.ps1` and excluded from `??` dashboard
-- Feature files should only contain user-facing functions
-- Each feature module with commands should have a help function (e.g., `timer` shows timer help)

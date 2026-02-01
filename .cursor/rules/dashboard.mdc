@@ -1,0 +1,58 @@
+---
+description: Dashboard function (??) and help system conventions
+globs: "core/Dashboard.ps1,core/Helpers.ps1"
+---
+
+# Dashboard & Help System
+
+## The `??` Function
+
+The `??` function is the main dashboard that lists all user-facing functions in the toolkit with their descriptions.
+
+### How it works
+
+1. Scans all `.ps1` files recursively in the toolkit directory
+2. Finds function definitions and extracts their `.SYNOPSIS` help block
+3. Displays function name, parameters, and description in a formatted table
+
+### Exclusion Mechanisms
+
+Functions and files can be excluded from `??` listing:
+
+**Excluded by function name** (`$ExcludedFunctions`):
+- `??` - the dashboard itself
+- `Write-SizeTable`, `Get-SizeColor` - internal display helpers
+
+**Excluded by file** (`$ExcludedFiles`):
+- `Helpers.ps1` - contains internal utilities only
+- `Timer.ps1` - has its own help via `timer` command
+
+### SYNOPSIS Requirement
+
+Every user-facing function MUST include a `<# .SYNOPSIS #>` block:
+
+```powershell
+function MyFunction {
+    <#
+    .SYNOPSIS
+        Brief one-line description shown in ?? dashboard.
+    #>
+    # function body
+}
+```
+
+Without this, the function shows "No description provided."
+
+## Helper Functions
+
+- Internal/helper functions go in `core/Helpers.ps1`, NOT in feature files
+- `Helpers.ps1` is loaded first by `loader.ps1` and excluded from `??` dashboard
+- Feature files should only contain user-facing functions
+
+## Module Help Functions
+
+Each feature module with multiple commands should have a help function:
+- Type `timer` (without args) → shows timer commands help
+- Type `??` → shows main dashboard
+
+This keeps `??` clean while providing detailed help for complex modules.

@@ -1,0 +1,50 @@
+---
+description: Timer module commands and documentation
+globs: "core/Timer.ps1,core/Helpers.ps1"
+---
+
+# Timer Module
+
+The timer module provides background timers with notifications. It's excluded from `??` dashboard and has its own help system.
+
+## Help Access
+
+- `timer` or `t` (without arguments) → shows full timer help dashboard
+- `tl` → lists active timers with quick command reference
+
+## Commands & Aliases
+
+| Command | Alias | Description |
+|---------|-------|-------------|
+| `Timer` | `t` | Start a background timer |
+| `TimerList` | `tl` | List active timers (-a all, -w live watch) |
+| `TimerWatch` | `tw` | Watch single timer with progress bar |
+| `TimerStop` | `ts` | Pause timer(s) |
+| `TimerResume` | `tr` | Resume stopped timer(s) |
+| `TimerRemove` | `td` | Remove timer(s) from list |
+| `TimerClear` | `tc` | Clear Lost and Completed timers |
+
+## Time Format
+
+Accepts: `1h30m`, `25m`, `90s`, `1h20m30s`
+
+## Implementation Notes
+
+- Timer jobs run as PowerShell background jobs (`Start-Job`)
+- Timer state persists in `$env:TEMP\ps-timers.json`
+- Jobs have naming convention: `Timer_<id>`
+- Helper functions (in `Helpers.ps1`): `ConvertTo-Seconds`, `Format-Duration`, `New-TimerId`, `Get-TimerData`, `Save-TimerData`, `Sync-TimerData`, `Start-TimerJob`
+
+## Timer States
+
+- `Running` - Active timer with job
+- `Stopped` - Paused, can resume
+- `Completed` - Finished successfully
+- `Lost` - Job not found after end time (e.g., terminal closed)
+
+## When Adding Timer Features
+
+1. User-facing functions go in `Timer.ps1`
+2. Internal helpers go in `Helpers.ps1`
+3. Update the `Show-TimerHelp` function if adding new commands
+4. Add alias in the aliases section of `Timer.ps1`

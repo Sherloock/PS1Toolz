@@ -451,7 +451,6 @@ Set-Alias -Name tw -Value TimerWatch -Scope Global
 Set-Alias -Name ts -Value TimerStop -Scope Global
 Set-Alias -Name tr -Value TimerResume -Scope Global
 Set-Alias -Name td -Value TimerRemove -Scope Global
-Set-Alias -Name tc -Value TimerClear -Scope Global
 
 function TimerWatch {
     <#
@@ -852,18 +851,18 @@ function TimerRemove {
         Write-Host "`n  All timers removed.`n" -ForegroundColor Yellow
     }
     elseif ($Id -eq 'done') {
-        # Remove only completed/stopped
+        # Remove only completed/lost (preserve stopped/paused)
         $toKeep = @()
         $removed = 0
 
         foreach ($t in $timers) {
-            if ($t.State -eq 'Running') {
-                $toKeep += $t
-            }
-            else {
+            if ($t.State -eq 'Completed' -or $t.State -eq 'Lost') {
                 $jobName = "Timer_$($t.Id)"
                 Remove-Job -Name $jobName -Force -ErrorAction SilentlyContinue
                 $removed++
+            }
+            else {
+                $toKeep += $t
             }
         }
 
