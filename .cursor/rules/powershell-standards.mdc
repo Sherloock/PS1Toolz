@@ -1,0 +1,42 @@
+---
+description: PowerShell toolkit coding standards and conventions
+globs: "**/*.ps1"
+alwaysApply: true
+---
+
+# PowerShell Toolkit Standards
+
+## Code Standards
+
+- Every function must include a `<# .SYNOPSIS #>` block for the `??` dashboard
+- Use `Write-Host` with colors for dashboard-style output
+- Handle long Windows paths using `-LiteralPath`
+- PowerShell 5.1 compatible (no ternary operators `? :`)
+- Format sizes in GB/MB using SI units
+
+## User Feedback (MANDATORY)
+
+- ALWAYS show progress/status during operations
+- Colors: Green=success, Yellow=warning, Red=error, Cyan=info
+- Display operation summaries (items processed, time elapsed, results count)
+- Never run silent operations
+
+## Documentation (MANDATORY)
+
+- ALWAYS update `README.md` when adding/modifying/removing functions
+- Document under appropriate section (Core/Dev/Media)
+- Keep descriptions concise (one line, action-oriented)
+- Update folder structure in README when creating new files/folders
+
+## Folder Structure
+
+- `core/`: System utilities, timers, dashboard components
+- `dev/`: Development tools, port management, navigation
+- `media/`: File/video library management
+
+## Helper Functions
+
+- Internal/helper functions go in `core/Helpers.ps1`, NOT in feature files
+- `Helpers.ps1` is loaded first by `loader.ps1` and excluded from `??` dashboard
+- Feature files should only contain user-facing functions
+- Each feature module with commands should have a help function (e.g., `timer` shows timer help)

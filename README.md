@@ -53,10 +53,12 @@ The `config.ps1` file is gitignored and won't be committed.
 ### Timer (type `t` for help)
 
 - `t <time> [-m msg] [-r N]` - Start a background timer with optional repeat
-- `tl [-a] [-w]` - List active timers (-a all, -w watch)
+- `tl [-a] [-w]` - List active timers (-a all, -w watch) with progress
+- `tw [id]` - Watch single timer with live countdown and progress bar
 - `ts [id|all]` - Stop/pause timer(s)
 - `tr [id|all]` - Resume timer(s)
 - `td [id|done|all]` - Remove timer(s)
+- `tc` - Clear all completed/lost timers
 
 ### Dev
 

@@ -25,6 +25,11 @@ function Show-TimerHelp {
     Write-Host "      List active timers (-a all, -w live watch)" -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  " -NoNewline
+    Write-Host "tw" -ForegroundColor Yellow -NoNewline
+    Write-Host " [id]" -ForegroundColor Gray
+    Write-Host "      Watch single timer with progress bar & countdown" -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "  " -NoNewline
     Write-Host "ts" -ForegroundColor Yellow -NoNewline
     Write-Host " [id|all]" -ForegroundColor Gray
     Write-Host "      Pause specific timer or all (can resume)" -ForegroundColor DarkGray
@@ -215,6 +220,7 @@ function Show-TimerListOnce {
     $colState = 10
     $colDuration = 11
     $colRemaining = 11
+    $colProgress = 8
     $colEndsAt = 10
     $colRepeat = 8
 
@@ -224,10 +230,11 @@ function Show-TimerListOnce {
     Write-Host ("{0,-$colState}" -f "STATE") -ForegroundColor DarkGray -NoNewline
     Write-Host ("{0,-$colDuration}" -f "DURATION") -ForegroundColor DarkGray -NoNewline
     Write-Host ("{0,-$colRemaining}" -f "REMAINING") -ForegroundColor DarkGray -NoNewline
+    Write-Host ("{0,-$colProgress}" -f "PROG") -ForegroundColor DarkGray -NoNewline
     Write-Host ("{0,-$colEndsAt}" -f "ENDS AT") -ForegroundColor DarkGray -NoNewline
     Write-Host ("{0,-$colRepeat}" -f "REPEAT") -ForegroundColor DarkGray -NoNewline
     Write-Host "MESSAGE" -ForegroundColor DarkGray
-    Write-Host ("  " + ("-" * 75)) -ForegroundColor DarkGray
+    Write-Host ("  " + ("-" * 83)) -ForegroundColor DarkGray
 
     foreach ($t in $timers) {
         $now = Get-Date
@@ -271,6 +278,18 @@ function Show-TimerListOnce {
         # Duration formatted
         $durationStr = Format-Duration -Seconds $t.Seconds
 
+        # Calculate progress percentage
+        $progressStr = "-"
+        if ($t.State -eq 'Running') {
+            $startTime = [DateTime]::Parse($t.StartTime)
+            $elapsed = ($now - $startTime).TotalSeconds
+            $percent = [math]::Min(100, [math]::Max(0, ($elapsed / $t.Seconds) * 100))
+            $progressStr = "{0:N0}%" -f $percent
+        }
+        elseif ($t.State -eq 'Completed') {
+            $progressStr = "100%"
+        }
+
         # Output row
         Write-Host "  " -NoNewline
         Write-Host ("{0,-$colId}" -f $t.Id) -ForegroundColor Cyan -NoNewline
@@ -279,10 +298,12 @@ function Show-TimerListOnce {
 
         if ($t.State -eq 'Running') {
             Write-Host ("{0,-$colRemaining}" -f $remainingStr) -ForegroundColor Yellow -NoNewline
+            Write-Host ("{0,-$colProgress}" -f $progressStr) -ForegroundColor Green -NoNewline
             Write-Host ("{0,-$colEndsAt}" -f $endsAtStr) -ForegroundColor Green -NoNewline
         }
         else {
             Write-Host ("{0,-$colRemaining}" -f "-") -ForegroundColor DarkGray -NoNewline
+            Write-Host ("{0,-$colProgress}" -f $progressStr) -ForegroundColor DarkGray -NoNewline
             Write-Host ("{0,-$colEndsAt}" -f "-") -ForegroundColor DarkGray -NoNewline
         }
 
@@ -361,12 +382,12 @@ function Show-TimerListWatch {
             [void]$sb.AppendLine("")
 
             # Column widths
-            $colId = 5; $colState = 10; $colDuration = 11; $colRemaining = 11; $colEndsAt = 10; $colRepeat = 8
+            $colId = 5; $colState = 10; $colDuration = 11; $colRemaining = 11; $colProgress = 8; $colEndsAt = 10; $colRepeat = 8
 
             # Header
-            $hdr = "  {0,-$colId}{1,-$colState}{2,-$colDuration}{3,-$colRemaining}{4,-$colEndsAt}{5,-$colRepeat}MESSAGE" -f "ID", "STATE", "DURATION", "REMAINING", "ENDS AT", "REPEAT"
+            $hdr = "  {0,-$colId}{1,-$colState}{2,-$colDuration}{3,-$colRemaining}{4,-$colProgress}{5,-$colEndsAt}{6,-$colRepeat}MESSAGE" -f "ID", "STATE", "DURATION", "REMAINING", "PROG", "ENDS AT", "REPEAT"
             [void]$sb.AppendLine("${gray}$hdr${reset}")
-            [void]$sb.AppendLine("${gray}  $("-" * 75)${reset}")
+            [void]$sb.AppendLine("${gray}  $("-" * 83)${reset}")
 
             foreach ($t in $timers) {
                 $now = Get-Date
@@ -383,9 +404,18 @@ function Show-TimerListWatch {
                 $endsAtStr = if ($t.State -eq 'Running') { $endTime.ToString('HH:mm:ss') } else { "-" }
                 $durationStr = Format-Duration -Seconds $t.Seconds
 
+                # Calculate progress percentage
+                $progressStr = "-"
+                if ($t.State -eq 'Running') {
+                    $startTime = [DateTime]::Parse($t.StartTime)
+                    $elapsed = ($now - $startTime).TotalSeconds
+                    $percent = [math]::Min(100, [math]::Max(0, ($elapsed / $t.Seconds) * 100))
+                    $progressStr = "{0:N0}%" -f $percent
+                }
+
                 if ($t.State -ne 'Running') { $remainingStr = "-"; $endsAtStr = "-" }
 
-                $line = "  ${cyan}{0,-$colId}${reset}${stateColor}{1,-$colState}${reset}${white}{2,-$colDuration}${reset}${yellow}{3,-$colRemaining}${reset}${green}{4,-$colEndsAt}${reset}${magenta}{5,-$colRepeat}${reset}${gray}{6}${reset}" -f $t.Id, $t.State, $durationStr, $remainingStr, $endsAtStr, $repeatStr, $msgDisplay
+                $line = "  ${cyan}{0,-$colId}${reset}${stateColor}{1,-$colState}${reset}${white}{2,-$colDuration}${reset}${yellow}{3,-$colRemaining}${reset}${green}{4,-$colProgress}${reset}${green}{5,-$colEndsAt}${reset}${magenta}{6,-$colRepeat}${reset}${gray}{7}${reset}" -f $t.Id, $t.State, $durationStr, $remainingStr, $progressStr, $endsAtStr, $repeatStr, $msgDisplay
                 [void]$sb.AppendLine($line)
             }
 
@@ -417,10 +447,195 @@ function Show-TimerListWatch {
 # Short aliases for quick access
 Set-Alias -Name t -Value Timer -Scope Global
 Set-Alias -Name tl -Value TimerList -Scope Global
+Set-Alias -Name tw -Value TimerWatch -Scope Global
 Set-Alias -Name ts -Value TimerStop -Scope Global
 Set-Alias -Name tr -Value TimerResume -Scope Global
 Set-Alias -Name td -Value TimerRemove -Scope Global
 Set-Alias -Name tc -Value TimerClear -Scope Global
+
+function TimerWatch {
+    <#
+    .SYNOPSIS
+        Watch a specific timer with live countdown and progress bar.
+    .PARAMETER Id
+        The timer ID to watch. If omitted and only one active timer exists, watches that one.
+    .EXAMPLE
+        tw 1
+        tw
+    #>
+    param(
+        [Parameter(Position=0)][string]$Id
+    )
+
+    $timers = @(Sync-TimerData)
+    $activeTimers = @($timers | Where-Object { $_.State -eq 'Running' })
+
+    if ($activeTimers.Count -eq 0) {
+        Write-Host "`n  No active timers to watch." -ForegroundColor Gray
+        Write-Host "  Use 't <time>' to create one.`n" -ForegroundColor DarkGray
+        return
+    }
+
+    # Auto-select if only one timer or find by ID
+    $timer = $null
+    if ([string]::IsNullOrEmpty($Id)) {
+        if ($activeTimers.Count -eq 1) {
+            $timer = $activeTimers[0]
+        }
+        else {
+            Write-Host "`n  Multiple active timers. Specify an ID:" -ForegroundColor Yellow
+            foreach ($t in $activeTimers) {
+                Write-Host "    [$($t.Id)] $($t.Message) - $(Format-Duration -Seconds $t.Seconds)" -ForegroundColor Gray
+            }
+            Write-Host ""
+            return
+        }
+    }
+    else {
+        $timer = $timers | Where-Object { $_.Id -eq $Id }
+        if (-not $timer) {
+            Write-Host "`n  Timer '$Id' not found.`n" -ForegroundColor Red
+            return
+        }
+        if ($timer.State -ne 'Running') {
+            Write-Host "`n  Timer '$Id' is not running (state: $($timer.State)).`n" -ForegroundColor Yellow
+            return
+        }
+    }
+
+    Show-TimerWatchDisplay -Timer $timer
+}
+
+function Show-TimerWatchDisplay {
+    <#
+    .SYNOPSIS
+        Internal function to display live timer watch with progress bar.
+    #>
+    param([PSCustomObject]$Timer)
+
+    # ANSI color codes
+    $esc = [char]27
+    $reset = "$esc[0m"
+    $cyan = "$esc[36m"
+    $green = "$esc[32m"
+    $yellow = "$esc[33m"
+    $white = "$esc[97m"
+    $gray = "$esc[90m"
+    $bold = "$esc[1m"
+    $dim = "$esc[2m"
+
+    # Progress bar characters
+    $barFull = [char]0x2588      # █
+    $barEmpty = [char]0x2591    # ░
+
+    [Console]::CursorVisible = $false
+
+    try {
+        $totalSeconds = $Timer.Seconds
+        $startTime = [DateTime]::Parse($Timer.StartTime)
+        $endTime = [DateTime]::Parse($Timer.EndTime)
+
+        while ($true) {
+            # Refresh timer data to check state
+            $currentTimers = @(Sync-TimerData)
+            $currentTimer = $currentTimers | Where-Object { $_.Id -eq $Timer.Id }
+
+            if (-not $currentTimer -or $currentTimer.State -ne 'Running') {
+                Clear-Host
+                Write-Host ""
+                Write-Host "  Timer [$($Timer.Id)] is no longer running." -ForegroundColor Yellow
+                Write-Host ""
+                break
+            }
+
+            $now = Get-Date
+            $remaining = $endTime - $now
+            $elapsed = $now - $startTime
+
+            # Calculate percentage
+            $elapsedSeconds = [math]::Max(0, $elapsed.TotalSeconds)
+            $remainingSeconds = [math]::Max(0, $remaining.TotalSeconds)
+            $percent = [math]::Min(100, [math]::Max(0, ($elapsedSeconds / $totalSeconds) * 100))
+
+            # Timer completed
+            if ($remainingSeconds -le 0) {
+                Clear-Host
+                $sb = [System.Text.StringBuilder]::new()
+                [void]$sb.AppendLine("")
+                [void]$sb.AppendLine("${green}${bold}  TIMER COMPLETED!${reset}")
+                [void]$sb.AppendLine("${cyan}  ================${reset}")
+                [void]$sb.AppendLine("")
+                [void]$sb.AppendLine("${gray}  Message:  ${white}$($Timer.Message)${reset}")
+                [void]$sb.AppendLine("${gray}  Duration: ${white}$(Format-Duration -Seconds $totalSeconds)${reset}")
+                [void]$sb.AppendLine("")
+
+                # Full progress bar
+                $barWidth = 40
+                $fullBar = [string]$barFull * $barWidth
+                [void]$sb.AppendLine("  ${green}$fullBar${reset} ${bold}100%${reset}")
+                [void]$sb.AppendLine("")
+                [void]$sb.AppendLine("${green}  Finished at $($endTime.ToString('HH:mm:ss'))${reset}")
+                [void]$sb.AppendLine("")
+
+                [Console]::Write($sb.ToString())
+                break
+            }
+
+            # Build display
+            $sb = [System.Text.StringBuilder]::new()
+
+            [void]$sb.AppendLine("")
+            [void]$sb.AppendLine("${cyan}${bold}  TIMER WATCH ${white}[$($Timer.Id)]${reset}")
+            [void]$sb.AppendLine("${cyan}  ===================${reset}")
+            [void]$sb.AppendLine("")
+            [void]$sb.AppendLine("${gray}  Message:  ${white}$($Timer.Message)${reset}")
+            [void]$sb.AppendLine("${gray}  Duration: ${white}$(Format-Duration -Seconds $totalSeconds)${reset}")
+            [void]$sb.AppendLine("${gray}  Ends at:  ${yellow}$($endTime.ToString('HH:mm:ss'))${reset}")
+
+            if ($Timer.RepeatTotal -gt 1) {
+                [void]$sb.AppendLine("${gray}  Repeat:   ${white}$($Timer.CurrentRun)/$($Timer.RepeatTotal)${reset}")
+            }
+
+            [void]$sb.AppendLine("")
+
+            # Progress bar
+            $barWidth = 40
+            $filledCount = [int][math]::Floor(($percent / 100) * $barWidth)
+            $emptyCount = [int]($barWidth - $filledCount)
+            $filledBar = [string]$barFull * $filledCount
+            $emptyBar = [string]$barEmpty * $emptyCount
+            $percentStr = "{0,5:N1}%" -f $percent
+
+            [void]$sb.AppendLine("  ${green}$filledBar${gray}$emptyBar${reset} ${bold}$percentStr${reset}")
+            [void]$sb.AppendLine("")
+
+            # Remaining time - large format
+            $remainingStr = "{0:D2}:{1:D2}:{2:D2}" -f [int]$remaining.Hours, $remaining.Minutes, $remaining.Seconds
+            [void]$sb.AppendLine("${yellow}${bold}  Remaining: $remainingStr${reset}")
+            [void]$sb.AppendLine("")
+            [void]$sb.AppendLine("${dim}  Press any key to exit watch mode...${reset}")
+
+            # Clear and write
+            Clear-Host
+            [Console]::Write($sb.ToString())
+
+            # Check for keypress (update every 100ms for smooth countdown)
+            $waited = 0
+            while ($waited -lt 500) {
+                if ([Console]::KeyAvailable) {
+                    [Console]::ReadKey($true) | Out-Null
+                    Write-Host ""
+                    return
+                }
+                Start-Sleep -Milliseconds 50
+                $waited += 50
+            }
+        }
+    }
+    finally {
+        [Console]::CursorVisible = $true
+    }
+}
 
 function TimerStop {
     <#
