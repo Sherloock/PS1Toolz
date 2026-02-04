@@ -59,4 +59,19 @@ $global:Config = @{
             Description = "Ultradian rhythm: 90m deep work + 20m rest"
         }
     }
+
+    # Functions to display in ?? toolbox (order here = order in list). TimerList is hidden; use 'timer' for full timer help.
+    FunctionNames = [ordered]@{
+        "ShowIP"    = "Displays local network info and public IP details."
+        "DiskSpace" = "Drive usage dashboard: Drive, Type, Label, Free/Total, Usage %."
+        "Fast"      = "Tests internet speed using the Speedtest CLI."
+        "Flatten"   = "Flatten directory: move/copy all files from subfolders to one folder."
+        "PortKill"   = "Finds and terminates the process on a given TCP port."
+        "NodeKill"   = "Scans for top-level node_modules only. Ignores nested ones."
+        "Go"         = "Jumps to bookmarked paths. Type 'go' without params to see list."
+        "Pass"       = "Generates a secure password. Use: Pass 32 -Complex"
+        "Size"       = "Lists files/folders by size (descending)."
+        "Movies"     = "Media paths summary and duplicate check in downloads."
+        "Timer"      = "[Time] [Message] [Repeat] | Starts a background timer. Use tl to view all timers."
+    }
 }

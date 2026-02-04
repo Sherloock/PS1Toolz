@@ -1,9 +1,4 @@
-# Timer and countdown utilities
-# Helper functions are in Helpers.ps1 (loaded first by loader.ps1)
-
-# ============================================================================
-# TIMER HELP DASHBOARD
-# ============================================================================
+# Timer module - Main user-facing functions
 
 function Show-TimerHelp {
     <#
@@ -76,10 +71,6 @@ function Show-TimerHelp {
     Write-Host "pomodoro, pomodoro-short, pomodoro-long, 52-17, 90-20" -ForegroundColor White
     Write-Host ""
 }
-
-# ============================================================================
-# TIMER FUNCTIONS
-# ============================================================================
 
 function Timer {
     <#
@@ -336,43 +327,32 @@ function Show-TimerListWatch {
     <#
     .SYNOPSIS
         Live-updating timer list display. Press any key to exit.
-    .DESCRIPTION
-        Optimized for fast refresh: only reads JSON file, no Task Scheduler queries.
-        State changes are detected via JSON file modifications (notification script updates it).
     #>
     param(
         [switch]$All
     )
 
-    # ANSI color codes
     $c = Get-AnsiColors
-
     [Console]::CursorVisible = $false
-
-    # Stopwatch for accurate 1-second ticks
     $sw = [System.Diagnostics.Stopwatch]::new()
 
     try {
-        # Initial load - just read JSON, no sync (fast)
         $timers = @(Get-TimerData)
 
         while ($true) {
             $sw.Restart()
             $now = Get-Date
 
-            # Fast path: only re-read JSON if file changed (no Task Scheduler queries)
             $cacheResult = Get-TimerDataIfChanged
             if ($cacheResult.Changed) {
                 $timers = @($cacheResult.Data)
             }
 
-            # Filter timers
             $displayTimers = $timers
             if (-not $All) {
                 $displayTimers = @($timers | Where-Object { $_.State -eq 'Running' -or $_.State -eq 'Paused' })
             }
 
-            # Build entire output as single string
             $sb = [System.Text.StringBuilder]::new()
 
             if ($displayTimers.Count -eq 0) {
@@ -383,7 +363,6 @@ function Show-TimerListWatch {
                 break
             }
 
-            # Count by state
             $running = @($displayTimers | Where-Object { $_.State -eq 'Running' }).Count
             $paused = @($displayTimers | Where-Object { $_.State -eq 'Paused' }).Count
 
@@ -415,27 +394,11 @@ function Show-TimerListWatch {
     }
 }
 
-# Short aliases for quick access
-Set-Alias -Name t -Value Timer -Scope Global
-Set-Alias -Name tl -Value TimerList -Scope Global
-Set-Alias -Name tw -Value TimerWatch -Scope Global
-Set-Alias -Name tp -Value TimerPause -Scope Global
-Set-Alias -Name tr -Value TimerResume -Scope Global
-Set-Alias -Name td -Value TimerRemove -Scope Global
-Set-Alias -Name tpre -Value TimerPresets -Scope Global
-
 function TimerPresets {
     <#
     .SYNOPSIS
         Shows interactive preset picker for common timer sequences.
-    .DESCRIPTION
-        Displays available timer presets like Pomodoro, 52-17, etc.
-        Select a preset to start the timer sequence immediately.
-    .EXAMPLE
-        tpre
     #>
-
-    # Build options from presets
     $options = @()
     foreach ($name in $script:TimerPresets.Keys | Sort-Object) {
         $preset = $script:TimerPresets[$name]
@@ -450,7 +413,6 @@ function TimerPresets {
         }
     }
 
-    # Add custom option
     $options += @{
         Id    = '_custom'
         Label = "[Enter custom sequence...]"
@@ -475,7 +437,6 @@ function TimerPresets {
         Timer -Time $pattern
     }
     else {
-        # Start the preset
         Timer -Time $selectedId
     }
 }
@@ -486,9 +447,6 @@ function TimerWatch {
         Watch a specific timer with live countdown and progress bar.
     .PARAMETER Id
         The timer ID to watch. If omitted and only one active timer exists, watches that one.
-    .EXAMPLE
-        tw 1
-        tw
     #>
     param(
         [Parameter(Position=0)][string]$Id
@@ -516,16 +474,11 @@ function Show-TimerWatchDisplay {
     <#
     .SYNOPSIS
         Internal function to display live timer watch with progress bar.
-    .DESCRIPTION
-        Optimized for fast refresh: only reads JSON file, no Task Scheduler queries.
-        State changes are detected via JSON file modifications (notification script updates it).
     #>
     param([PSCustomObject]$Timer)
 
     $c = Get-AnsiColors
     [Console]::CursorVisible = $false
-
-    # Stopwatch for accurate 1-second ticks
     $sw = [System.Diagnostics.Stopwatch]::new()
 
     try {
@@ -537,11 +490,9 @@ function Show-TimerWatchDisplay {
             $sw.Restart()
             $now = Get-Date
 
-            # Fast path: only re-read JSON if file changed (no Task Scheduler queries)
             $cacheResult = Get-TimerDataIfChanged
             if ($cacheResult.Changed) {
                 $currentTimer = $cacheResult.Data | Where-Object { $_.Id -eq $Timer.Id }
-                # Update endTime if timer was modified (e.g., repeat cycle)
                 if ($currentTimer -and $currentTimer.EndTime) {
                     $endTime = [DateTime]::Parse($currentTimer.EndTime)
                 }
@@ -593,10 +544,6 @@ function TimerPause {
         Pauses a background timer. Shows picker if no ID specified.
     .PARAMETER Id
         The timer ID to pause. Use 'all' to pause all. Omit for picker.
-    .EXAMPLE
-        tp
-        tp 1
-        tp all
     #>
     param(
         [Parameter(Position=0)][string]$Id
@@ -646,15 +593,6 @@ function TimerResume {
     <#
     .SYNOPSIS
         Resumes a paused or lost timer. Shows picker if no ID specified.
-    .DESCRIPTION
-        - Paused timers: resume with remaining time
-        - Lost timers: restart with full duration (current repeat cycle preserved)
-    .PARAMETER Id
-        The timer ID to resume. Use 'all' to resume all. Omit for picker.
-    .EXAMPLE
-        tr
-        tr 1
-        tr all
     #>
     param(
         [Parameter(Position=0)][string]$Id
@@ -710,10 +648,6 @@ function TimerRemove {
         Removes a timer from the list by ID, or clears all finished timers.
     .PARAMETER Id
         The timer ID to remove. Use 'all' to remove all, 'done' to remove completed/stopped only.
-    .EXAMPLE
-        TimerRemove abc1
-        TimerRemove done
-        TimerRemove all
     #>
     param(
         [Parameter(Position=0)][string]$Id
@@ -761,4 +695,3 @@ function TimerRemove {
         }
     }
 }
-
